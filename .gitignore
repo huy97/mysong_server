@@ -2,3 +2,5 @@
 /.idea
 /.idea/*
 /.DS_Store
+/media_storage/*
+/storage/*
