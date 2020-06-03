@@ -1,0 +1,54 @@
+const fs = require('fs');
+const formidable = require('formidable');
+const {defaultResponse, getFileType} = require('../utils/helper');
+const {MEDIA_TYPE} = require('../utils/constant');
+const cryptoRandomString = require('crypto-random-string');
+const musicMetadata = require('music-metadata');
+const mediaModel = require('../models/media');
+
+const uploadMediaFile = async (req, res, next) => {
+    try{
+        const form = formidable({maxFileSize: 100 * 1024 * 1024});
+        form.parse(req, async (err, fields, files) => {
+            if(err) return defaultResponse(res);
+            if(!files.file.size) return defaultResponse(res, 500, 'Vui lòng nhập file upload.');
+            let mediaType = getFileType(files.file);
+            if(![MEDIA_TYPE.AUDIO, MEDIA_TYPE.VIDEO, MEDIA_TYPE.IMAGE].includes(mediaType)){
+                return defaultResponse(res, 422, `Định dạng không được phép upload.`);
+            }
+            form.uploadDir = "media_storage/files";
+            if(mediaType === MEDIA_TYPE.IMAGE){
+                form.uploadDir = "storage/files";
+            }
+            let tmpPath = files.file.path;
+            let newPath = form.uploadDir + '/' + Date.now() + '_' + cryptoRandomString({length: 20, type: 'numeric'}) + '_' + files.file.name;
+            let mediaInfo = {};
+            if(getFileType(files.file) === MEDIA_TYPE.AUDIO || getFileType(files.file) === MEDIA_TYPE.VIDEO) {
+                let {format} = await musicMetadata.parseFile(tmpPath);
+                if(format){
+                    mediaInfo = format;
+                }
+            }
+            mediaModel.create({
+                shortCode: cryptoRandomString({length: 10, type: 'distinguishable'}),
+                filePath: newPath,
+                originalPath: newPath,
+                mediaType,
+                fileSize: files.file.size,
+                ...mediaInfo
+            }, (err, doc) => {
+                if(err) return defaultResponse(res, 500, err.toString());
+                fs.rename(tmpPath, newPath, (err) => {
+                    if (err) return defaultResponse(res, 500, err.toString());
+                    return defaultResponse(res, 200, 'Upload thành công.', doc.toJSON());
+                });
+            });
+        });
+    }catch (e) {
+        return defaultResponse(res, 500, e.toString());
+    }
+};
+
+module.exports = {
+    uploadMediaFile,
+};
