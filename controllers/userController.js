@@ -3,15 +3,17 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const {SALT_ROUND} = require("../utils/constant");
-const {defaultResponse, getDefaultSkipLimit} = require("../utils/helper");
+const {defaultResponse, getSkipLimit} = require("../utils/helper");
 const userModel = require('../models/user');
 const userRoleModel = require('../models/userRole');
 const songLike = require('../models/songLike');
-const artistFollow = require('../models/artistFollow');
+const followArtist = require('../models/followArtist');
 
 
 const getUserInfo = async (req, res, next) => {
-    return defaultResponse(res, 200, req.user);
+    return defaultResponse(res, 200, {
+        data: req.user
+    });
 };
 const login = async (req, res, next) => {
     const {username, password} = req.body;
@@ -58,14 +60,16 @@ const register = async (req, res, next) => {
             userId: user.id,
             roleId: 1
         });
-        return defaultResponse(res, 200, 'Tạo tài khoản thành công.', {user});
+        return defaultResponse(res, 200, 'Tạo tài khoản thành công.', {
+            data: user
+        });
     }catch (e) {
         return defaultResponse(res)
     }
 };
-const getSongsLiked = async (req, res, next) => {
+const getLikedSongs = async (req, res, next) => {
     try{
-        const {skip, limit} = getDefaultSkipLimit(req);
+        const {skip, limit} = getSkipLimit(req);
         const result = await songLike.aggregate([
             {
                 $match: {
@@ -91,15 +95,17 @@ const getSongsLiked = async (req, res, next) => {
                 $unwind: "$song"
             }
         ]);
-        return defaultResponse(res, 200, "", result);
+        return defaultResponse(res, 200, "Thành công", {
+            data: result
+        });
     }catch (e) {
         return defaultResponse(res);
     }
 };
-const getArtistsFollowed = async (req, res, next) => {
+const getFollowedArtists = async (req, res, next) => {
     try{
-        const {skip, limit} = getDefaultSkipLimit(req);
-        const result = await artistFollow.aggregate([
+        const {skip, limit} = getSkipLimit(req);
+        const result = await followArtist.aggregate([
             {
                 $match: {
                     userId: req.user._id,
@@ -124,7 +130,9 @@ const getArtistsFollowed = async (req, res, next) => {
                 $unwind: "$song"
             }
         ]);
-        return defaultResponse(res, 200, "", result);
+        return defaultResponse(res, 200, "Thành công", {
+            data: result
+        });
     }catch (e) {
         return defaultResponse(res);
     }
@@ -134,6 +142,6 @@ module.exports = {
     getUserInfo,
     login,
     register,
-    getSongsLiked,
-    getArtistsFollowed
+    getLikedSongs,
+    getFollowedArtists
 };

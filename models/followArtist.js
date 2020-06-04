@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-const artistFollowSchema = new Schema({
+const followArtistSchema = new Schema({
     userId: mongoose.ObjectId,
     artistId: mongoose.ObjectId,
     isFollow: Boolean
@@ -9,4 +9,4 @@ const artistFollowSchema = new Schema({
     timestamps: true
 });
 
-module.exports = mongoose.model('ArtistFollow', artistFollowSchema, 'artists_follow');
+module.exports = mongoose.model('FollowArtist', followArtistSchema, 'follow_artists');

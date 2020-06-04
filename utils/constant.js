@@ -4,7 +4,8 @@ const PERMISSION_CODE = {
     READ: "READ",
     CREATE: "CREATE",
     UPDATE: "UPDATE",
-    DELETE: "DELETE"
+    DELETE: "DELETE",
+    MANAGER: "MANAGER"
 };
 
 const MEDIA_TYPE = {

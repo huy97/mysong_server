@@ -1,12 +1,10 @@
 const {validationResult} = require("express-validator");
-const {defaultResponse} = require('../utils/helper');
+const {defaultResponse, getSkipLimit, getTotal} = require('../utils/helper');
+const {hasPermission} = require('../middleware/checkPermission');
 const cryptoRandomString = require('crypto-random-string');
 const slugify = require('slugify');
 const mongoose = require('mongoose');
 const songModel = require('../models/song');
-const songMediaModel = require('../models/songMedia');
-const songCategoryModel = require('../models/songCategory');
-const songLyricModel = require('../models/songLyric');
 
 const createNewSong = async (req, res, next) => {
     const {title, thumbnail, mediaId, hasLyric, artistName, lyricLink, zone, isOffical, lyrics, categories} = req.body;
@@ -54,7 +52,9 @@ const createNewSong = async (req, res, next) => {
             }
         }));
         Promise.all([songMedia, songCategories, songLyrics]).then((values) => {
-            return defaultResponse(res, 200, 'Thành công', song.toJSON());
+            return defaultResponse(res, 200, 'Thành công', {
+                data: song.toJSON()
+            });
         }).catch((e) => {
             return defaultResponse(res);
         });
@@ -62,6 +62,24 @@ const createNewSong = async (req, res, next) => {
         return defaultResponse(res);
     }
 };
+
+const updateSong = async (req, res, next) => {
+    const {songId} = req.params;
+    try{
+        let song = await songModel.findById(songId);
+    }catch(e){
+
+    }
+}
+
+const deleteSong = async (req, res, next) => {
+    const {songId} = req.params;
+    try{
+        let song = await songModel.findById(songId);
+    }catch(e){
+
+    }
+}
 
 const getSongInfo = async (req, res, next) => {
     const {slug, shortCode} = req.body;
@@ -78,20 +96,124 @@ const getSongInfo = async (req, res, next) => {
                 $lookup: {
                     from: 'song_categories',
                     localField: "_id",
-                    foriegnField: "songId",
+                    foreignField: "songId",
                     as: 'categories'
                 }
+            },
+            {
+                $lookup: {
+                    from: 'categories',
+                    localField: "categories.categoryId",
+                    foreignField: "_id",
+                    as: 'categories'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'song_artists',
+                    localField: "_id",
+                    foreignField: "songId",
+                    as: 'artists'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'artists',
+                    localField: "artists.artistId",
+                    foreignField: "_id",
+                    as: 'artists'
+                }
+            },
+            {
+                $limit: 1
             }
         ]);
-        
-        return defaultResponse(res, 200, 'Thành công', song);
+        if(song.length){
+            return defaultResponse(res, 200, 'Thành công', {
+                data: song[0]
+            });
+        }else{
+            return defaultResponse(res, 422, 'Không tìm thấy dữ liệu.');
+        }
     }catch(e){
         return defaultResponse(res);
     }
     
 }
 
+const getListSong = async (req, res, next) => {
+    const { isOffical = false, sort = {_id: -1} } = req.body;
+    const {skip, limit} = getSkipLimit(req);
+    try{
+        let query = [
+            {
+                $match: {
+                    isOffical,
+                    isDelete: false
+                }
+            },
+            {
+                $lookup: {
+                    from: 'song_categories',
+                    localField: "_id",
+                    foreignField: "songId",
+                    as: 'categories'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'categories',
+                    localField: "categories.categoryId",
+                    foreignField: "_id",
+                    as: 'categories'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'song_artists',
+                    localField: "_id",
+                    foreignField: "songId",
+                    as: 'artists'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'artists',
+                    localField: "artists.artistId",
+                    foreignField: "_id",
+                    as: 'artists'
+                }
+            },
+            {
+                $sort: sort
+            }
+        ];
+        const total =  await songModel.aggregate([...query, 
+            {
+                $count: "total"
+            }
+        ]);
+        const song = await songModel.aggregate([...query, 
+            {
+                $skip: skip
+            },
+            {
+                $limit: limit
+            }
+        ]);
+        return defaultResponse(res, 200, 'Thành công', {
+            total: getTotal(total),
+            data: song
+        });
+    }catch(e){
+        return defaultResponse(res);
+    }
+}
+
 module.exports = {
     createNewSong,
-    getSongInfo
+    updateSong,
+    deleteSong,
+    getSongInfo,
+    getListSong
 };

@@ -10,6 +10,7 @@ const userController = require('../../controllers/userController');
 router.get('/get-user-info', authenticationMiddleware, userController.getUserInfo);
 router.post('/login', validationMiddleware.createUserValidation, userController.login);
 router.post('/register', validationMiddleware.createUserValidation, userController.register);
-router.get('/get-songs-liked', authenticationMiddleware, userController.getSongsLiked);
+router.get('/get-liked-songs', authenticationMiddleware, userController.getLikedSongs);
+router.get('/get-followed-artists', authenticationMiddleware, userController.getFollowedArtists);
 
 module.exports = router;

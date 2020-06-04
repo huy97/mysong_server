@@ -4,6 +4,8 @@ const {defaultResponse, getFileType} = require('../utils/helper');
 const {MEDIA_TYPE} = require('../utils/constant');
 const cryptoRandomString = require('crypto-random-string');
 const musicMetadata = require('music-metadata');
+const mongoose = require('mongoose');
+const songMediaModel = require('../models/songMedia');
 const mediaModel = require('../models/media');
 
 const uploadMediaFile = async (req, res, next) => {
@@ -40,15 +42,39 @@ const uploadMediaFile = async (req, res, next) => {
                 if(err) return defaultResponse(res, 500, err.toString());
                 fs.rename(tmpPath, newPath, (err) => {
                     if (err) return defaultResponse(res, 500, err.toString());
-                    return defaultResponse(res, 200, 'Upload thành công.', doc.toJSON());
+                    return defaultResponse(res, 200, 'Upload thành công.', {
+                        data: doc.toJSON()
+                    });
                 });
             });
         });
     }catch (e) {
-        return defaultResponse(res, 500, e.toString());
+        return defaultResponse(res);
     }
 };
 
+const getMediaStream = async (req, res, next) => {
+    const {songId} = req.query;
+    try{
+        let songMedia = await songMediaModel.findOne({songId: mongoose.Types.ObjectId(songId)});
+        if(songMedia){
+            let media = await mediaModel.findById(songMedia.mediaId);
+            if(media){
+                return defaultResponse(res, 200, "Thành công", {
+                    data: media
+                });
+            }else{
+                throw new Error();
+            }
+        }else{
+            throw new Error();
+        }
+    }catch(e){
+        return defaultResponse(res);
+    }
+}
+
 module.exports = {
     uploadMediaFile,
+    getMediaStream
 };
