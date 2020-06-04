@@ -11,7 +11,7 @@ const followArtist = require('../models/followArtist');
 
 
 const getUserInfo = async (req, res, next) => {
-    return defaultResponse(res, 200, {
+    return defaultResponse(res, 200, 'Thành công',{
         data: req.user
     });
 };

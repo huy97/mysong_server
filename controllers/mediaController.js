@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const formidable = require('formidable');
 const {defaultResponse, getFileType} = require('../utils/helper');
 const {MEDIA_TYPE} = require('../utils/constant');
@@ -21,6 +22,9 @@ const uploadMediaFile = async (req, res, next) => {
             form.uploadDir = "media_storage/files";
             if(mediaType === MEDIA_TYPE.IMAGE){
                 form.uploadDir = "storage/files";
+            }
+            if(!fs.existsSync(form.uploadDir)){
+                fs.mkdirSync(path.resolve(__dirname, '../' + form.uploadDir), { recursive: true });
             }
             let tmpPath = files.file.path;
             let newPath = form.uploadDir + '/' + Date.now() + '_' + cryptoRandomString({length: 20, type: 'numeric'}) + '_' + files.file.name;
@@ -72,7 +76,7 @@ const getMediaStream = async (req, res, next) => {
     }catch(e){
         return defaultResponse(res);
     }
-}
+};
 
 module.exports = {
     uploadMediaFile,

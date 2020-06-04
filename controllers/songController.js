@@ -5,9 +5,12 @@ const cryptoRandomString = require('crypto-random-string');
 const slugify = require('slugify');
 const mongoose = require('mongoose');
 const songModel = require('../models/song');
+const songMediaModel = require('../models/songMedia');
+const songCategoryModel = require('../models/songCategory');
+const songLyricModel = require('../models/songLyric');
 
 const createNewSong = async (req, res, next) => {
-    const {title, thumbnail, mediaId, hasLyric, artistName, lyricLink, zone, isOffical, lyrics, categories} = req.body;
+    const {title, thumbnail, mediaId, hasLyric, artistName, lyricLink, zone, isOffical, lyrics = [], categories = []} = req.body;
     const errors = validationResult(req);
     if(!errors.isEmpty()){
         return defaultResponse(res, 422, "Có lỗi xảy ra", null, errors.array());
@@ -59,6 +62,7 @@ const createNewSong = async (req, res, next) => {
             return defaultResponse(res);
         });
     }catch (e) {
+        console.log(e)
         return defaultResponse(res);
     }
 };
@@ -70,16 +74,24 @@ const updateSong = async (req, res, next) => {
     }catch(e){
 
     }
-}
+};
 
 const deleteSong = async (req, res, next) => {
     const {songId} = req.params;
     try{
         let song = await songModel.findById(songId);
+        if(song.userId !== req.user.id){
+            if(!hasPermission(['MANAGER'], req.roles)){
+                return defaultResponse(res, 403, 'Bạn không có quyền thao tác chức năng này');
+            }
+        }
+        song.isDelete = true;
+        await song.save();
+        return defaultResponse(res, 200, 'Thành công');
     }catch(e){
-
+        return defaultResponse(res);
     }
-}
+};
 
 const getSongInfo = async (req, res, next) => {
     const {slug, shortCode} = req.body;
@@ -125,10 +137,53 @@ const getSongInfo = async (req, res, next) => {
                 }
             },
             {
+                $lookup: {
+                    from: 'song_lyrics',
+                    localField: "_id",
+                    foreignField: "songId",
+                    as: 'lyrics'
+                }
+            },
+            {
+                $lookup: {
+                    from: "song_likes",
+                    let: { id: "$_id" },
+                    pipeline: [
+                        { $match: {
+                                isLike: true,
+                                $expr: { $eq: [ "$$id", "$songId" ] }
+                            }},
+                        { $count: "count" }
+                    ],
+                    "as": "like"
+                }
+            },
+            {
+                $lookup: {
+                    from: "song_comments",
+                    let: { id: "$_id" },
+                    pipeline: [
+                        { $match: {
+                                isLike: true,
+                                $expr: { $eq: [ "$$id", "$songId" ] }
+                            }},
+                        { $count: "count" }
+                    ],
+                    "as": "comment"
+                }
+            },
+            {
+                $addFields: {
+                    like: { $sum: "$like.count" },
+                    comment: { $sum: "$comment.count" },
+                }
+            },
+            {
                 $limit: 1
             }
         ]);
         if(song.length){
+            await songModel.findByIdAndUpdate(song[0]._id, {listen: song[0].listen + 1});
             return defaultResponse(res, 200, 'Thành công', {
                 data: song[0]
             });
@@ -136,10 +191,11 @@ const getSongInfo = async (req, res, next) => {
             return defaultResponse(res, 422, 'Không tìm thấy dữ liệu.');
         }
     }catch(e){
+        console.log(e)
         return defaultResponse(res);
     }
-    
-}
+
+};
 
 const getListSong = async (req, res, next) => {
     const { isOffical = false, sort = {_id: -1} } = req.body;
@@ -185,15 +241,23 @@ const getListSong = async (req, res, next) => {
                 }
             },
             {
+                $lookup: {
+                    from: 'song_likes',
+                    localField: "_id",
+                    foreignField: "songId",
+                    as: 'likes'
+                }
+            },
+            {
                 $sort: sort
             }
         ];
-        const total =  await songModel.aggregate([...query, 
+        const total =  await songModel.aggregate([...query,
             {
                 $count: "total"
             }
         ]);
-        const song = await songModel.aggregate([...query, 
+        const song = await songModel.aggregate([...query,
             {
                 $skip: skip
             },
@@ -206,9 +270,10 @@ const getListSong = async (req, res, next) => {
             data: song
         });
     }catch(e){
+        console.log(e)
         return defaultResponse(res);
     }
-}
+};
 
 module.exports = {
     createNewSong,
