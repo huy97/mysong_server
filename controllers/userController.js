@@ -9,6 +9,7 @@ const userRoleModel = require('../models/userRole');
 const songLike = require('../models/songLike');
 const artistFollow = require('../models/artistFollow');
 
+
 const getUserInfo = async (req, res, next) => {
     return defaultResponse(res, 200, req.user);
 };
@@ -68,7 +69,8 @@ const getSongsLiked = async (req, res, next) => {
         const result = await songLike.aggregate([
             {
                 $match: {
-                    userId: req.user._id
+                    userId: req.user._id,
+                    isDelete: false
                 }
             },
             {
@@ -100,7 +102,8 @@ const getArtistsFollowed = async (req, res, next) => {
         const result = await artistFollow.aggregate([
             {
                 $match: {
-                    userId: req.user._id
+                    userId: req.user._id,
+                    isDelete: false
                 }
             },
             {

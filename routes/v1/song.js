@@ -8,5 +8,6 @@ const validationMiddleware = require('../../middleware/validation');
 const songController = require('../../controllers/songController');
 
 router.post('/create', [authenticationMiddleware, can([PERMISSION_CODE.CREATE, PERMISSION_CODE.UPDATE, PERMISSION_CODE.DELETE]), validationMiddleware.createNewSongValidation], songController.createNewSong);
+router.post('/get-song-info', songController.getSongInfo);
 
 module.exports = router;

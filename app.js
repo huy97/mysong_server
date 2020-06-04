@@ -6,8 +6,8 @@ const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const mongoose = require('mongoose');
 const morgan = require('morgan');
+const expressSwagger = require('express-swagger-generator');
 const cors = require('cors');
-
 const maintenanceMode = require('./middleware/maintenanceMode');
 const v1Router = require('./routes/v1');
 const cdnRouter = require('./routes/cdn');
@@ -19,10 +19,6 @@ const limiter = rateLimit({
   message: "Hệ thống bận, vui lòng quay lại sau"
 });
 
-app.use(limiter);
-app.use(cors());
-const expressSwagger = require('express-swagger-generator')(app);
-
 let options = {
   swaggerDefinition: {
     info: {
@@ -30,7 +26,7 @@ let options = {
       title: 'Swagger',
       version: '1.0.0',
     },
-    host: 'localhost:3000',
+    host: 'localhost:' + (process.env.PORT || 3000),
     basePath: '/api/v1',
     produces: [
       "application/json"
@@ -40,13 +36,15 @@ let options = {
   basedir: __dirname,
   files: ['./controllers/**/*.js']
 };
-expressSwagger(options);
+
+expressSwagger(app)(options);
+app.use(limiter);
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(morgan('tiny'));
-
 app.use(maintenanceMode(process.env.NODE_ENV));
 app.use('/api/v1', v1Router);
 app.use('/cdn', cdnRouter);
@@ -74,10 +72,12 @@ if(process.env.NODE_ENV === 'production'){
       pass: process.env.DB_PASS
     },
     useNewUrlParser: true,
+    useUnifiedTopology: true
   });
 }else{
   mongoose.connect(`mongodb://${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_DATABASE}`, {
     useNewUrlParser: true,
+    useUnifiedTopology: true
   });
 }
 

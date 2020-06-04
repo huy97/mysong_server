@@ -63,6 +63,35 @@ const createNewSong = async (req, res, next) => {
     }
 };
 
+const getSongInfo = async (req, res, next) => {
+    const {slug, shortCode} = req.body;
+    try{
+        const song = await songModel.aggregate([
+            {
+                $match: {
+                    slug,
+                    shortCode,
+                    isDelete: false
+                }
+            },
+            {
+                $lookup: {
+                    from: 'song_categories',
+                    localField: "_id",
+                    foriegnField: "songId",
+                    as: 'categories'
+                }
+            }
+        ]);
+        
+        return defaultResponse(res, 200, 'Thành công', song);
+    }catch(e){
+        return defaultResponse(res);
+    }
+    
+}
+
 module.exports = {
-    createNewSong
+    createNewSong,
+    getSongInfo
 };
