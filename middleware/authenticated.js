@@ -42,7 +42,7 @@ const Authenticated = async (req, res, next) => {
         });
         req.roles = roles;
     }catch (e) {
-        return defaultResponse(res, 400, 'Uỷ quyền thất bại.')
+        return defaultResponse(res, 401, 'Uỷ quyền thất bại.', null, null, )
     }
     next();
 };

@@ -1,16 +1,22 @@
 const {validationResult} = require("express-validator");
-const {defaultResponse, getSkipLimit, getTotal} = require('../utils/helper');
+const {defaultResponse, getSkipLimit} = require('../utils/helper');
+const {SONG_STATUS, PERMISSION_CODE} = require('../utils/constant');
 const {hasPermission} = require('../middleware/checkPermission');
 const cryptoRandomString = require('crypto-random-string');
 const slugify = require('slugify');
+const lodash = require('lodash');
 const mongoose = require('mongoose');
 const songModel = require('../models/song');
+const artistModel = require('../models/artist');
 const songMediaModel = require('../models/songMedia');
+const songArtistModel = require('../models/songArtist');
 const songCategoryModel = require('../models/songCategory');
+const songCommentModel = require('../models/songComment');
 const songLyricModel = require('../models/songLyric');
+const songLikeModel = require('../models/songLike');
 
 const createNewSong = async (req, res, next) => {
-    const {title, thumbnail, mediaId, hasLyric, artistName, lyricLink, zone, isOffical, lyrics = [], categories = []} = req.body;
+    const {title, thumbnail, mediaId, hasLyric, artistName, lyricLink, zone, isOfficial, artists = [], lyrics = [], categories = []} = req.body;
     const errors = validationResult(req);
     if(!errors.isEmpty()){
         return defaultResponse(res, 422, "Có lỗi xảy ra", null, errors.array());
@@ -20,7 +26,7 @@ const createNewSong = async (req, res, next) => {
         let slug = slugify(title, '-');
         let link = `/music/${slug}/${shortCode}.html`;
         let mvLink = "";
-        if(isOffical){
+        if(isOfficial){
             mvLink = `/video/${slug}/${shortCode}.html`;
         }
         const song = await songModel.create({
@@ -30,36 +36,44 @@ const createNewSong = async (req, res, next) => {
             artistName,
             hasLyric,
             lyricLink,
-            isOffical,
+            isOfficial,
             link,
             mvLink,
             zone,
             slug,
             userId: req.user._id,
         });
-        const songMedia = songMediaModel.create({
+        const songMediaQuery = songMediaModel.create({
             songId: song._id,
             mediaId: mongoose.Types.ObjectId(mediaId)
         });
-        const songCategories = songCategoryModel.create(categories.map((categoryId) => {
+        const artistQuery = artistModel.find({_id: {$in: artists}});
+        const songArtistsQuery = songArtistModel.create(artists.map((artistId) => {
+            return {
+                songId: song._id,
+                artistId: mongoose.Types.ObjectId(artistId)
+            }
+        }));
+        const songCategoriesQuery = songCategoryModel.create(categories.map((categoryId) => {
             return {
                 songId: song._id,
                 categoryId: mongoose.Types.ObjectId(categoryId)
             }
         }));
-        const songLyrics = songLyricModel.create(lyrics.map((lyric) => {
+        const songLyricsQuery = songLyricModel.create(lyrics.map((lyric) => {
             return {
                 songId: song._id,
                 userId: req.user._id,
                 content: lyric
             }
         }));
-        Promise.all([songMedia, songCategories, songLyrics]).then((values) => {
-            return defaultResponse(res, 200, 'Thành công', {
-                data: song.toJSON()
-            });
-        }).catch((e) => {
-            return defaultResponse(res);
+        const [songMedia, songCategories, songLyrics, songArtists, artistNames] = await Promise.all([songMediaQuery, songCategoriesQuery, songLyricsQuery, songArtistsQuery, artistQuery]);
+        if(artistNames.length){
+            song.artistName = artistNames.map((obj) => obj.fullName).join(', ');
+            await song.save();
+        }
+        return defaultResponse(res, 200, 'Thành công', {
+            data: song.toJSON()
         });
     }catch (e) {
         console.log(e)
@@ -69,10 +83,57 @@ const createNewSong = async (req, res, next) => {
 
 const updateSong = async (req, res, next) => {
     const {songId} = req.params;
+    const {title, thumbnail, hasLyric, artistName, lyricLink, zone, status, isOfficial, artists = [], categories = []} = req.body;
+    const errors = validationResult(req);
+    if(!errors.isEmpty()){
+        return defaultResponse(res, 422, "Có lỗi xảy ra", null, errors.array());
+    }
     try{
-        let song = await songModel.findById(songId);
+        const song = await songModel.findById(songId);
+        if(song.userId !== req.user.id){
+            if(!hasPermission([PERMISSION_CODE.MANAGER], req.roles)){
+                return Promise.reject('Bạn không có quyền thao tác chức năng này.');
+            }
+        }
+        let updateFields = {};
+        updateFields.slug = !lodash.isEmpty(title) ? slugify(title, '-') : song.title;
+        updateFields.link = `/music/${updateFields.slug}/${song.shortCode}.html`;
+        updateFields.isOfficial = lodash.isBoolean(isOfficial) ? isOfficial : song.isOfficial;
+        if(updateFields.isOfficial){
+            updateFields.mvLink = `/video/${updateFields.slug}/${song.shortCode}.html`;
+        }
+        updateFields.zone = !lodash.isEmpty(zone) ? zone : song.zone;
+        updateFields.artistName = !lodash.isEmpty(artistName) ? artistName : song.artistName;
+        updateFields.thumbnail = !lodash.isEmpty(thumbnail) ? thumbnail : song.thumbnail;
+        updateFields.artistName = !lodash.isEmpty(artistName) ? artistName : song.artistName;
+        updateFields.hasLyric = lodash.isBoolean(hasLyric) ? hasLyric : song.hasLyric;
+        updateFields.lyricLink = !lodash.isEmpty(lyricLink) ? lyricLink : song.lyricLink;
+        updateFields.status = !lodash.isEmpty(status) ? status : song.status;
+        let stackDelete = [];
+        let stackCreate = [];
+        if(artists.length){
+            stackDelete.push(songArtistModel.deleteMany({songId: mongoose.Types.ObjectId(songId)}));
+            stackCreate.push(songArtistModel.create(artists.map((artistId) => {
+                return {
+                    songId: song._id,
+                    artistId: mongoose.Types.ObjectId(artistId)
+                }
+            })));
+        }
+        if(categories.length){
+            stackDelete.push(songCategoryModel.deleteMany({songId: mongoose.Types.ObjectId(songId)}));
+            stackCreate.push(songCategoryModel.create(categories.map((categoryId) => {
+                return {
+                    songId: song._id,
+                    categoryId: mongoose.Types.ObjectId(categoryId)
+                }
+            })));
+        }
+        await Promise.all([Promise.all(stackDelete), Promise.all(stackCreate)]);
+        const songUpdate = await songModel.findByIdAndUpdate(songId, updateFields);
+        return getSongInfo({...req, body: {shortCode: songUpdate.shortCode, slug: songUpdate.slug}}, res, next);
     }catch(e){
-
+        return defaultResponse(res);
     }
 };
 
@@ -80,8 +141,11 @@ const deleteSong = async (req, res, next) => {
     const {songId} = req.params;
     try{
         let song = await songModel.findById(songId);
+        if(!song){
+            return defaultResponse(res, 422, 'Không tìm thấy dữ liệu.');
+        }
         if(song.userId !== req.user.id){
-            if(!hasPermission(['MANAGER'], req.roles)){
+            if(!hasPermission([PERMISSION_CODE.MANAGER], req.roles)){
                 return defaultResponse(res, 403, 'Bạn không có quyền thao tác chức năng này');
             }
         }
@@ -96,7 +160,7 @@ const deleteSong = async (req, res, next) => {
 const getSongInfo = async (req, res, next) => {
     const {slug, shortCode} = req.body;
     try{
-        const song = await songModel.aggregate([
+        const songs = await songModel.aggregate([
             {
                 $match: {
                     slug,
@@ -105,6 +169,9 @@ const getSongInfo = async (req, res, next) => {
                 }
             },
             {
+                $limit: 1
+            },
+            {
                 $lookup: {
                     from: 'song_categories',
                     localField: "_id",
@@ -135,79 +202,53 @@ const getSongInfo = async (req, res, next) => {
                     foreignField: "_id",
                     as: 'artists'
                 }
-            },
-            {
-                $lookup: {
-                    from: 'song_lyrics',
-                    localField: "_id",
-                    foreignField: "songId",
-                    as: 'lyrics'
-                }
-            },
-            {
-                $lookup: {
-                    from: "song_likes",
-                    let: { id: "$_id" },
-                    pipeline: [
-                        { $match: {
-                                isLike: true,
-                                $expr: { $eq: [ "$$id", "$songId" ] }
-                            }},
-                        { $count: "count" }
-                    ],
-                    "as": "like"
-                }
-            },
-            {
-                $lookup: {
-                    from: "song_comments",
-                    let: { id: "$_id" },
-                    pipeline: [
-                        { $match: {
-                                isLike: true,
-                                $expr: { $eq: [ "$$id", "$songId" ] }
-                            }},
-                        { $count: "count" }
-                    ],
-                    "as": "comment"
-                }
-            },
-            {
-                $addFields: {
-                    like: { $sum: "$like.count" },
-                    comment: { $sum: "$comment.count" },
-                }
-            },
-            {
-                $limit: 1
             }
         ]);
-        if(song.length){
-            await songModel.findByIdAndUpdate(song[0]._id, {listen: song[0].listen + 1});
-            return defaultResponse(res, 200, 'Thành công', {
-                data: song[0]
-            });
-        }else{
-            return defaultResponse(res, 422, 'Không tìm thấy dữ liệu.');
+        if(!songs.length){
+            return  defaultResponse(res, 422, 'Không tìm thấy dữ liệu');
         }
+        await songModel.findByIdAndUpdate(songs[0]._id, {
+            $inc: {
+                listen: 1
+            }
+        });
+        return defaultResponse(res, 200, 'Thành công', {
+            data: songs[0]
+        });
     }catch(e){
-        console.log(e)
+        console.log(e);
         return defaultResponse(res);
     }
 
 };
 
 const getListSong = async (req, res, next) => {
-    const { isOffical = false, sort = {_id: -1} } = req.body;
+    const { isOfficial = false, status = SONG_STATUS.ACTIVE, keyword } = req.body;
     const {skip, limit} = getSkipLimit(req);
     try{
-        let query = [
+        let match = {
+            status,
+            isOfficial,
+            isDelete: false
+        };
+        if(keyword){
+            match = {...match, $text: { $search: keyword }};
+        }
+        const songQuery = songModel.aggregate([
             {
-                $match: {
-                    isOffical,
-                    isDelete: false
-                }
+                $match: match
             },
+            {
+                $skip: skip
+            },
+            {
+                $limit: limit
+            },
+            // {
+            //     $sort: {
+            //         createdAt: -1
+            //     }
+            // },
             {
                 $lookup: {
                     from: 'song_categories',
@@ -239,38 +280,264 @@ const getListSong = async (req, res, next) => {
                     foreignField: "_id",
                     as: 'artists'
                 }
-            },
-            {
-                $lookup: {
-                    from: 'song_likes',
-                    localField: "_id",
-                    foreignField: "songId",
-                    as: 'likes'
-                }
-            },
-            {
-                $sort: sort
-            }
-        ];
-        const total =  await songModel.aggregate([...query,
-            {
-                $count: "total"
             }
         ]);
-        const song = await songModel.aggregate([...query,
+        const totalQuery = await songModel.countDocuments(match);
+        const [songs, total] = await Promise.all([songQuery, totalQuery]);
+        return defaultResponse(res, 200, 'Thành công', {
+            total,
+            data: songs
+        });
+    }catch(e){
+        console.log(e)
+        return defaultResponse(res);
+    }
+};
+
+const getSongLyrics = async (req, res, next) => {
+    const {songId} = req.params;
+    const {skip, limit} = getSkipLimit(req);
+    try{
+        const songLyrics = await songLyricModel.aggregate([
+            {
+                $match: {
+                    songId: mongoose.Types.ObjectId(songId)
+                }
+            },
             {
                 $skip: skip
             },
             {
                 $limit: limit
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: "userId",
+                    foreignField: "_id",
+                    as: 'users'
+                }
+            },
+            {
+                $unwind: '$users'
+            },
+            {
+                $project: {
+                    'users.password': 0,
+                    'users.accessToken': 0,
+                }
             }
-        ]);
+            ]
+        );
+        const total = await songLyricModel.countDocuments({songId: mongoose.Types.ObjectId(songId)});
         return defaultResponse(res, 200, 'Thành công', {
-            total: getTotal(total),
-            data: song
+            total,
+            data: songLyrics
         });
-    }catch(e){
+    }catch (e) {
+        return defaultResponse(res);
+    }
+};
+
+const getSongComments = async (req, res, next) => {
+    const {songId} = req.params;
+    const {skip, limit} = getSkipLimit(req);
+    try{
+        const songComments = await songCommentModel.aggregate([
+                {
+                    $match: {
+                        songId: mongoose.Types.ObjectId(songId)
+                    }
+                },
+                {
+                    $skip: skip
+                },
+                {
+                    $limit: limit
+                },
+                {
+                    $lookup: {
+                        from: 'users',
+                        localField: "userId",
+                        foreignField: "_id",
+                        as: 'users'
+                    }
+                },
+                {
+                    $unwind: '$users'
+                },
+                {
+                    $project: {
+                        'users.password': 0,
+                        'users.accessToken': 0,
+                    }
+                }
+            ]
+        );
+        const total = await songCommentModel.countDocuments({songId: mongoose.Types.ObjectId(songId)});
+        return defaultResponse(res, 200, 'Thành công', {
+            total,
+            data: songComments
+        });
+    }catch (e) {
+        return defaultResponse(res);
+    }
+};
+
+const createSongLyric = async (req, res, next) => {
+    const {songId, content} = req.body;
+    const errors = validationResult(req);
+    if(!errors.isEmpty()){
+        return defaultResponse(res, 422, "Có lỗi xảy ra", null, errors.array());
+    }
+    try {
+        const songLyric = await songLyricModel.create({
+            songId: mongoose.Types.ObjectId(songId),
+            userId: req.user._id,
+            content
+        });
+        return defaultResponse(res, 200, 'Thành công', {
+            data: songLyric
+        });
+    }catch (e) {
+        return defaultResponse(res);
+    }
+};
+
+const updateSongLyric = async (req, res, next) => {
+    const {lyricId} = req.params;
+    const {content} = req.body;
+    const errors = validationResult(req);
+    if(!errors.isEmpty()){
+        return defaultResponse(res, 422, "Có lỗi xảy ra", null, errors.array());
+    }
+    try {
+        const songLyric = await songLyricModel.findById(lyricId);
+        if(songLyric.userId !== req.user.id){
+            if(!hasPermission([PERMISSION_CODE.MANAGER], req.roles)){
+                return defaultResponse(res, 403,'Bạn không có quyền thao tác chức năng này.');
+            }
+        }
+        songLyric.content = content;
+        await songLyric.save();
+        return defaultResponse(res, 200, 'Thành công', {
+            data: songLyric
+        });
+    }catch (e) {
         console.log(e)
+        return defaultResponse(res);
+    }
+};
+
+const deleteSongLyric = async (req, res, next) => {
+    const {lyricId} = req.params;
+    try{
+        const lyric = await songLyricModel.findById(lyricId);
+        if(!lyric){
+            return defaultResponse(res, 422, 'Không tìm thấy dữ liệu.');
+        }
+        if(lyric.userId !== req.user.id){
+            if(!hasPermission([PERMISSION_CODE.MANAGER], req.roles)){
+                return defaultResponse(res, 403, 'Bạn không có quyền thao tác chức năng này.');
+            }
+        }
+        await lyric.remove();
+        return defaultResponse(res, 200, 'Thành công');
+    }catch (e) {
+        return defaultResponse(res);
+    }
+};
+
+const createSongComment = async (req, res, next) => {
+    const {songId, content} = req.body;
+    const errors = validationResult(req);
+    if(!errors.isEmpty()){
+        return defaultResponse(res, 422, "Có lỗi xảy ra", null, errors.array());
+    }
+    try {
+        const songComment = await songCommentModel.create({
+            songId: mongoose.Types.ObjectId(songId),
+            userId: req.user._id,
+            content
+        });
+        await songModel.findByIdAndUpdate(songId, {
+            $inc: {
+                comment: 1
+            }
+        });
+        return defaultResponse(res, 200, 'Thành công', {
+            data: songComment
+        });
+    }catch (e) {
+        return defaultResponse(res);
+    }
+};
+
+const deleteSongComment = async (req, res, next) => {
+    const {commentId} = req.params;
+    try{
+        const comment = await songCommentModel.findById(commentId);
+        if(!comment){
+            return defaultResponse(res, 422, 'Không tìm thấy dữ liệu.');
+        }
+        if(comment.userId !== req.user.id){
+            if(!hasPermission([PERMISSION_CODE.MANAGER], req.roles)){
+                return defaultResponse(res, 403, 'Bạn không có quyền thao tác chức năng này.');
+            }
+        }
+        await comment.remove();
+        await songModel.findByIdAndUpdate(comment.songId, {
+            $inc: {
+                comment: -1
+            }
+        });
+        return defaultResponse(res, 200, 'Thành công');
+    }catch (e) {
+        return defaultResponse(res);
+    }
+};
+
+const likeSong = async (req, res, next) => {
+    const {songId} = req.params;
+    try{
+        let songLike = await songLikeModel.findOne({songId, userId: req.user._id});
+        if(!songLike){
+            songLike = await songLikeModel.create({songId, userId: req.user._id, isLike: true});
+        }else if(!songLike.isLike){
+            songLike.isLike = true;
+            await songLike.save();
+        }
+        if(songLike.isLike){
+            await songModel.findByIdAndUpdate(songId, {
+                $inc: {
+                    like: 1
+                }
+            });
+        }
+        return defaultResponse(res, 200, 'Thành công');
+    }catch (e) {
+        return defaultResponse(res);
+    }
+};
+
+const dislikeSong = async (req, res, next) => {
+    const {songId} = req.params;
+    try{
+        let songLike = await songLikeModel.findOne({songId, userId: req.user._id});
+        if(!songLike){
+            return defaultResponse(res, 200, 'Không tìm thấy dữ liệu.');
+        }else{
+            if(songLike.isLike){
+                await songModel.findByIdAndUpdate(songId, {
+                    $inc: {
+                        like: -1
+                    }
+                });
+            }
+            await songLike.remove();
+        }
+        return defaultResponse(res, 200, 'Thành công');
+    }catch (e) {
         return defaultResponse(res);
     }
 };
@@ -280,5 +547,14 @@ module.exports = {
     updateSong,
     deleteSong,
     getSongInfo,
-    getListSong
+    getListSong,
+    getSongLyrics,
+    createSongLyric,
+    updateSongLyric,
+    deleteSongLyric,
+    createSongComment,
+    deleteSongComment,
+    getSongComments,
+    likeSong,
+    dislikeSong
 };

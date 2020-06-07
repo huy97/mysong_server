@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const songLikeSchema = new Schema({
-    songId: mongoose.ObjectId,
+    songId: [{type: mongoose.Schema.Types.ObjectId, ref: 'Song'}],
     userId: mongoose.ObjectId,
     isLike: Boolean
 }, {

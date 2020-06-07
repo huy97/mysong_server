@@ -10,7 +10,7 @@ const songSchema = new Schema({
     slug: {type: String, default: ""},
     link: {type: String, default: ""},
     mvLink: {type: String, default: ""},
-    isOffical: {type: Boolean, default: false},
+    isOfficial: {type: Boolean, default: false},
     userId: mongoose.ObjectId,
     status: {type: Number, default: 0},
     listen: {type: Number, default: 0},
@@ -18,9 +18,19 @@ const songSchema = new Schema({
     hasLyric: {type: Boolean, default: false},
     lyricLink: {type: String, default: ""},
     zone: {type: String, default: "private"},
+    like: {type: Number, default: 0},
+    comment: {type: Number, default: 0},
     isDelete: {type: Boolean, default: false}
 }, {
     timestamps: true
 });
-
+songSchema.index({
+    name: 'text',
+    description: 'text',
+}, {
+    weights: {
+        title: 1,
+        artistName: 1,
+    },
+});
 module.exports = mongoose.model('Song', songSchema);

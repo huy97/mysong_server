@@ -1,4 +1,5 @@
 const SALT_ROUND = 10;
+const OLD_PASSWORD_MANAGER = "OLD_PASSWORD_MANAGER";
 
 const PERMISSION_CODE = {
     READ: "READ",
@@ -15,8 +16,15 @@ const MEDIA_TYPE = {
     OTHER: "OTHER",
 };
 
+const SONG_STATUS = {
+    PRIVATE: 0,
+    ACTIVE: 1,
+    PENDING: 2
+};
+
 module.exports = {
     SALT_ROUND,
     PERMISSION_CODE,
-    MEDIA_TYPE
+    MEDIA_TYPE,
+    SONG_STATUS
 };
