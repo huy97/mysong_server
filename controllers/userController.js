@@ -74,7 +74,7 @@ const register = async (req, res, next) => {
 
 const updateUser = async (req, res, next) => {
     const {userId} = req.params;
-    const {fullName, avatar, isDelete, isVip, startVipAt} = req.body;
+    const {fullName, avatar} = req.body;
     const errors = validationResult(req);
     if(!errors.isEmpty()){
         return defaultResponse(res, 422, 'Vui lòng nhập đủ thông tin', null, errors.array());
@@ -90,15 +90,6 @@ const updateUser = async (req, res, next) => {
             return defaultResponse(res, 422, 'User không tồn tại.');
         }
         user.fullName = fullName;
-        if(hasPermission([PERMISSION_CODE.MANAGER], req.roles)){
-            if(lodash.isBoolean(isVip)){
-                user.isVip = isVip;
-                user.startVipAt = startVipAt;
-            }
-            if(lodash.isBoolean(isDelete)){
-                user.isDelete = isDelete;
-            }
-        }
         if(avatar){
             user.avatar = avatar;
         }
@@ -143,7 +134,7 @@ const changePassword = async (req, res, next) => {
     }
 };
 
-const logoutAllDevice = async (req, res, next) => {
+const logout = async (req, res, next) => {
     const {userId} = req.params;
     try{
         if(userId !== req.user.id){
@@ -338,6 +329,8 @@ const getListUser = async (req, res, next) => {
     }
 };
 
+
+
 module.exports = {
     getUserInfo,
     login,
@@ -346,6 +339,6 @@ module.exports = {
     getFollowedArtists,
     updateUser,
     changePassword,
-    logoutAllDevice,
+    logout,
     getListUser
 };
