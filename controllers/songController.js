@@ -16,7 +16,7 @@ const songLyricModel = require('../models/songLyric');
 const songLikeModel = require('../models/songLike');
 
 const createNewSong = async (req, res, next) => {
-    const {title, thumbnail, mediaId, hasLyric, artistName, lyricLink, zone, isOfficial, artists = [], lyrics = [], categories = []} = req.body;
+    const {title, thumbnail, mediaIds = [], hasLyric, artistName, lyricLink, zone, isOfficial, artists = [], lyrics = [], categories = []} = req.body;
     const errors = validationResult(req);
     if(!errors.isEmpty()){
         return defaultResponse(res, 422, "Có lỗi xảy ra", null, errors.array());
@@ -43,10 +43,12 @@ const createNewSong = async (req, res, next) => {
             slug,
             userId: req.user._id,
         });
-        const songMediaQuery = songMediaModel.create({
-            songId: song._id,
-            mediaId: mongoose.Types.ObjectId(mediaId)
-        });
+        const songMediaQuery = songMediaModel.create(mediaIds.map((mediaId) => {
+            return {
+                songId: song._id,
+                mediaId: mongoose.Types.ObjectId(mediaId)
+            }
+        }));
         const artistQuery = artistModel.find({_id: {$in: artists}});
         const songArtistsQuery = songArtistModel.create(artists.map((artistId) => {
             return {
@@ -109,10 +111,13 @@ const updateSong = async (req, res, next) => {
         updateFields.hasLyric = lodash.isBoolean(hasLyric) ? hasLyric : song.hasLyric;
         updateFields.lyricLink = !lodash.isEmpty(lyricLink) ? lyricLink : song.lyricLink;
         updateFields.status = !lodash.isEmpty(status) ? status : song.status;
-        let stackDelete = [];
         let stackCreate = [];
+        let stackDelete = [
+            songArtistModel.deleteMany({songId: mongoose.Types.ObjectId(songId)}),
+            songCategoryModel.deleteMany({songId: mongoose.Types.ObjectId(songId)})
+        ];
+        await Promise.all(stackDelete);
         if(artists.length){
-            stackDelete.push(songArtistModel.deleteMany({songId: mongoose.Types.ObjectId(songId)}));
             stackCreate.push(songArtistModel.create(artists.map((artistId) => {
                 return {
                     songId: song._id,
@@ -121,7 +126,6 @@ const updateSong = async (req, res, next) => {
             })));
         }
         if(categories.length){
-            stackDelete.push(songCategoryModel.deleteMany({songId: mongoose.Types.ObjectId(songId)}));
             stackCreate.push(songCategoryModel.create(categories.map((categoryId) => {
                 return {
                     songId: song._id,
@@ -129,7 +133,7 @@ const updateSong = async (req, res, next) => {
                 }
             })));
         }
-        await Promise.all([Promise.all(stackDelete), Promise.all(stackCreate)]);
+        await Promise.all(stackCreate);
         const songUpdate = await songModel.findByIdAndUpdate(songId, updateFields);
         return getSongInfo({...req, body: {shortCode: songUpdate.shortCode, slug: songUpdate.slug}}, res, next);
     }catch(e){
@@ -158,7 +162,8 @@ const deleteSong = async (req, res, next) => {
 };
 
 const getSongInfo = async (req, res, next) => {
-    const {slug, shortCode} = req.body;
+    const {slug, shortCode} = req.query;
+    
     try{
         const songs = await songModel.aggregate([
             {
@@ -223,16 +228,16 @@ const getSongInfo = async (req, res, next) => {
 };
 
 const getListSong = async (req, res, next) => {
-    const { isOfficial = false, status = SONG_STATUS.ACTIVE, keyword } = req.body;
+    const { isOfficial, status = SONG_STATUS.ACTIVE, keyword } = req.query;
     const {skip, limit} = getSkipLimit(req);
     try{
         let match = {
-            status,
-            isOfficial,
+            status: Number(status),
+            isOfficial: Boolean(isOfficial),
             isDelete: false
         };
         if(keyword){
-            match = {...match, $text: { $search: keyword }};
+            match.$text = { $search: keyword };
         }
         const songQuery = songModel.aggregate([
             {
@@ -244,11 +249,11 @@ const getListSong = async (req, res, next) => {
             {
                 $limit: limit
             },
-            // {
-            //     $sort: {
-            //         createdAt: -1
-            //     }
-            // },
+            {
+                $sort: {
+                    createdAt: -1
+                }
+            },
             {
                 $lookup: {
                     from: 'song_categories',
@@ -497,50 +502,37 @@ const deleteSongComment = async (req, res, next) => {
     }
 };
 
-const likeSong = async (req, res, next) => {
+const likeDislikeSong = async (req, res, next) => {
     const {songId} = req.params;
+    const {isLike} = req.body;
     try{
-        let songLike = await songLikeModel.findOne({songId, userId: req.user._id});
-        if(!songLike){
-            songLike = await songLikeModel.create({songId, userId: req.user._id, isLike: true});
-        }else if(!songLike.isLike){
-            songLike.isLike = true;
-            await songLike.save();
+        const exist = await songLikeModel.findOne({songId, userId: req.user._id});
+        if(exist){
+            if(isFollow){
+                return defaultResponse(res, 200, 'Thành công');
+            }
+        }else{
+            if(!isFollow){
+                return defaultResponse(res, 200, 'Thành công');
+            }
         }
-        if(songLike.isLike){
-            await songModel.findByIdAndUpdate(songId, {
-                $inc: {
-                    like: 1
-                }
-            });
+
+        if(isLike){
+            await songLikeModel.create({songId, userId: req.user._id});
+        }else{
+            const songLike = await songLikeModel.deleteOne({songId, userId: req.user._id});
         }
+        await songModel.findByIdAndUpdate(songId, {
+            $inc: {
+                like: isLike ? 1 : -1
+            }
+        });
         return defaultResponse(res, 200, 'Thành công');
     }catch (e) {
         return defaultResponse(res);
     }
 };
 
-const dislikeSong = async (req, res, next) => {
-    const {songId} = req.params;
-    try{
-        let songLike = await songLikeModel.findOne({songId, userId: req.user._id});
-        if(!songLike){
-            return defaultResponse(res, 200, 'Không tìm thấy dữ liệu.');
-        }else{
-            if(songLike.isLike){
-                await songModel.findByIdAndUpdate(songId, {
-                    $inc: {
-                        like: -1
-                    }
-                });
-            }
-            await songLike.remove();
-        }
-        return defaultResponse(res, 200, 'Thành công');
-    }catch (e) {
-        return defaultResponse(res);
-    }
-};
 
 module.exports = {
     createNewSong,
@@ -555,6 +547,5 @@ module.exports = {
     createSongComment,
     deleteSongComment,
     getSongComments,
-    likeSong,
-    dislikeSong
+    likeDislikeSong,
 };

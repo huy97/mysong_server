@@ -8,4 +8,9 @@ const songArtistSchema = new Schema({
     timestamps: true
 });
 
+songArtistSchema.index({
+    songId: 1,
+    artistId: 1
+});
+
 module.exports = mongoose.model('SongArtist', songArtistSchema, 'song_artists');

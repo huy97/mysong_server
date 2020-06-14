@@ -8,4 +8,9 @@ const songCategorySchema = new Schema({
     timestamps: true
 });
 
+songCategorySchema.index({
+    songId: 1,
+    categoryId: 1
+});
+
 module.exports = mongoose.model('SongCategory', songCategorySchema, 'song_categories');

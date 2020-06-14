@@ -10,4 +10,9 @@ const songCommentSchema = new Schema({
     timestamps: true
 });
 
+songCommentSchema.index({
+    songId: 1,
+    userId: 1
+});
+
 module.exports = mongoose.model('SongComment', songCommentSchema, 'song_comments');

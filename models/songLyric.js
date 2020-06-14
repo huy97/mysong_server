@@ -10,4 +10,9 @@ const songLyricSchema = new Schema({
     timestamps: true
 });
 
+songLyricSchema.index({
+    songId: 1,
+    userId: 1
+});
+
 module.exports = mongoose.model('SongLyric', songLyricSchema, 'song_lyrics');

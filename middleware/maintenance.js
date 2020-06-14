@@ -1,6 +1,6 @@
 const {defaultResponse} = require('../utils/helper');
 
-const maintenanceMode = (isMaintain) => {
+const maintenance = (isMaintain) => {
     return (req, res, next) => {
         if (isMaintain === 'maintenance') {
             return defaultResponse(res, 500, 'Hệ thống đang tiến hành bảo trì và nâng cấp.');
@@ -9,4 +9,4 @@ const maintenanceMode = (isMaintain) => {
     }
 };
 
-module.exports = maintenanceMode;
+module.exports = maintenance;

@@ -8,9 +8,11 @@ const {SALT_ROUND, OLD_PASSWORD_MANAGER, PERMISSION_CODE} = require("../utils/co
 const {defaultResponse, getSkipLimit} = require("../utils/helper");
 const userModel = require('../models/user');
 const userRoleModel = require('../models/userRole');
-const songLike = require('../models/songLike');
+const songLikeModel = require('../models/songLike');
+const songModel = require('../models/song');
 const followArtist = require('../models/followArtist');
-
+const permissionModel = require('../models/permission');
+const roleModel = require('../models/role');
 
 const getUserInfo = async (req, res, next) => {
     return defaultResponse(res, 200, 'Thành công',{
@@ -156,13 +158,73 @@ const logout = async (req, res, next) => {
     }
 };
 
+const getMySongs = async (req, res, next) => {
+    try{
+        const {skip, limit} = getSkipLimit(req);
+        const resultQuery = songModel.aggregate([
+            {
+                $match: {
+                    userId: req.user._id
+                }
+            },
+            {
+                $skip: skip
+            },
+            {
+                $limit: limit
+            },
+            {
+                $lookup: {
+                    from: 'song_categories',
+                    localField: "songId",
+                    foreignField: "songId",
+                    as: 'categories'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'categories',
+                    localField: "categories.categoryId",
+                    foreignField: "_id",
+                    as: 'categories'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'song_artists',
+                    localField: "songId",
+                    foreignField: "songId",
+                    as: 'artists'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'artists',
+                    localField: "artists.artistId",
+                    foreignField: "_id",
+                    as: 'artists'
+                }
+            }
+        ]);
+        const totalQuery = songModel.countDocuments({
+            userId: req.user._id
+        });
+        const [result, total] = await Promise.all([resultQuery, totalQuery]);
+        return defaultResponse(res, 200, "Thành công", {
+            total,
+            data: result,
+        });
+    }catch (e) {
+        return defaultResponse(res);
+    }
+}
+
 const getLikedSongs = async (req, res, next) => {
     try{
         const {skip, limit} = getSkipLimit(req);
-        const result = await songLike.aggregate([
+        const resultQuery = songLikeModel.aggregate([
             {
                 $match: {
-                    isLike: true,
                     userId: req.user._id
                 }
             },
@@ -228,10 +290,16 @@ const getLikedSongs = async (req, res, next) => {
                 }
             }
         ]);
+        const totalQuery = songLikeModel.countDocuments();
+        const [result, total] = await Promise.all([resultQuery, totalQuery]);
+        console.log(total);
+        
         return defaultResponse(res, 200, "Thành công", {
+            total,
             data: result
         });
     }catch (e) {
+        console.log(e);
         return defaultResponse(res);
     }
 };
@@ -239,7 +307,7 @@ const getLikedSongs = async (req, res, next) => {
 const getFollowedArtists = async (req, res, next) => {
     try{
         const {skip, limit} = getSkipLimit(req);
-        const result = await followArtist.aggregate([
+        const resultQuery = followArtist.aggregate([
             {
                 $match: {
                     userId: req.user._id
@@ -263,7 +331,12 @@ const getFollowedArtists = async (req, res, next) => {
                 $unwind: "$artist"
             }
         ]);
+        const totalQuery = followArtist.countDocuments({
+            userId: req.user._id
+        });
+        const [result, total] = await Promise.all([resultQuery, totalQuery]);
         return defaultResponse(res, 200, "Thành công", {
+            total,
             data: result
         });
     }catch (e) {
@@ -272,19 +345,18 @@ const getFollowedArtists = async (req, res, next) => {
 };
 
 const getListUser = async (req, res, next) => {
-    const {keyword, isDelete, isVip} = req.body;
+    const {keyword, isDelete, isVip} = req.query;
     try{
         const {skip, limit} = getSkipLimit(req);
-        let match = {};
+        let match = {
+            isDelete: Boolean(isDelete),
+            isVip: Boolean(isVip),
+            isDelete: false
+        };
         if(keyword){
-            match = {...match, $text: { $search: keyword }};
+            match.$text = { $search: keyword };
         }
-        if(lodash.isBoolean(isDelete)){
-            match.isDelete = isDelete;
-        }
-        if(lodash.isBoolean(isVip)){
-            match.isVip = isVip;
-        }
+        
         let usersQuery = userModel.aggregate([
             {
                 $match: match
@@ -317,8 +389,8 @@ const getListUser = async (req, res, next) => {
                 }
             }
         ]);
-        let countTotal = userModel.countDocuments(match);
-        const [users, total] = await Promise.all([usersQuery, countTotal]);
+        let totalQuery = userModel.countDocuments(match);
+        const [users, total] = await Promise.all([usersQuery, totalQuery]);
         return defaultResponse(res, 200, 'Thành công', {
             total,
             data: users
@@ -329,7 +401,111 @@ const getListUser = async (req, res, next) => {
     }
 };
 
+const getPermissions = async (req, res, next) => {
+    try{
+        const {skip, limit} = getSkipLimit(req);
+        const resultQuery = permissionModel.find({}).skip(skip).limit(limit);
+        const totalQuery = permissionModel.countDocuments();
+        const [result, total] = await Promise.all([resultQuery, totalQuery]);
+        return defaultResponse(res, 200, 'Thành công', {
+            total,
+            data: result
+        })
+    }catch(e){
+        return defaultResponse(res);
+    }
+}
 
+const getListRoles = async (req, res, next) => {
+    try{
+        const {skip, limit} = getSkipLimit(req);
+        const resultQuery = roleModel.find({}).skip(skip).limit(limit);
+        const totalQuery = roleModel.countDocuments();
+        const [result, total] = await Promise.all([resultQuery, totalQuery]);
+        return defaultResponse(res, 200, 'Thành công', {
+            total,
+            data: result
+        })
+    }catch(e){
+        return defaultResponse(res);
+    }
+}
+
+const createRole = async (req, res, next) => {
+    const {description, permissionCodes} = req.body;
+    try{
+        const total = await roleModel.countDocuments();
+        let roleId = total + 1;
+        const role = await roleModel.create({
+            roleId,
+            description,
+            permissionCodes
+        });
+        return defaultResponse(res, 200, 'Thành công', {
+            data: role
+        });
+    }catch(e){
+        return defaultResponse(res);
+    }
+}
+
+const updateRole = async (req, res, next) => {
+    const {roleId} = req.params;
+    const {description, permissionCodes} = req.body;
+    try{
+        let updateFields = {};
+        if(description){
+            updateFields.description = description;
+        }
+        if(permissionCodes && Array.isArray(permissionCodes)){
+            updateFields.permissionCodes = permissionCodes;
+        }
+        const result = await roleModel.updateOne({roleId}, updateFields, {
+            new: true
+        });
+        return defaultResponse(res, 200, 'Thành công', {
+            data: result
+        });
+    }catch(e){
+        return defaultResponse(res);
+    }
+}
+
+const deleteRole = async (req, res, next) => {
+    const {roleId} = req.params;
+    try{
+        const role = await roleModel.deleteOne({roleId});
+        return defaultResponse(res, 200, 'Thành công');
+    }catch(e){
+        return defaultResponse(res);
+    }
+}
+
+const updateUserRoles = async (req, res, next) => {
+    const {userId} = req.params;
+    const {roleIds = []} = req.body;
+    try{
+        let user = await userModel.findById(userId);
+        if(!user){
+            return defaultResponse(res, 422, 'User không tồn tại.');
+        }
+        await userRoleModel.deleteMany({userId});
+        let result = [];
+        if(Array.isArray(roleIds) && roleIds.length){
+            result = await userRoleModel.create(roleIds.map((roleId) => {
+                return {
+                    roleId,
+                    userId
+                }
+            }));
+        }
+        return defaultResponse(res, 200, 'Thành công', {
+            data: result
+        });
+    }catch(e){
+        return defaultResponse(res);
+    }
+}
 
 module.exports = {
     getUserInfo,
@@ -340,5 +516,12 @@ module.exports = {
     updateUser,
     changePassword,
     logout,
-    getListUser
+    getListUser,
+    getMySongs,
+    getPermissions,
+    getListRoles,
+    createRole,
+    updateRole,
+    deleteRole,
+    updateUserRoles
 };

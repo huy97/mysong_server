@@ -1,7 +1,7 @@
 'use strict';
 const express = require('express');
 const router = express.Router();
-const {defaultResponse} = require('../utils/helper');
+const {defaultResponse} = require('../../utils/helper');
 const fs = require('fs');
 const path = require('path');
 const fileType = require('file-type');

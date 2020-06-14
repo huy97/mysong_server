@@ -5,7 +5,7 @@ const hasPermission = (permission = [], roles = []) => {
     let hasPermission = false;
     permission.map((per) => {
         roles.map((role) => {
-            if(role.permissionCodes.includes(per)){
+            if(role.permissionCodes && Array.isArray(role.permissionCodes) && role.permissionCodes.includes(per)){
                 hasPermission = true;
                 return false;
             }

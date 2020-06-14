@@ -8,4 +8,9 @@ const listenHistorySchema = new Schema({
     timestamps: true
 });
 
+listenHistorySchema.index({
+    songId: 1,
+    artistId: 1
+});
+
 module.exports = mongoose.model('ListenHistory', listenHistorySchema, 'listen_histories');

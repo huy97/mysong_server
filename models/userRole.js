@@ -8,4 +8,9 @@ const userRoleSchema = new Schema({
     timestamps: true
 });
 
+userRoleSchema.index({
+    userId: 1,
+    roleId: 1
+});
+
 module.exports = mongoose.model('UserRole', userRoleSchema, 'user_roles');

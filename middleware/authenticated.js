@@ -38,11 +38,12 @@ const Authenticated = async (req, res, next) => {
         req.user = user;
         let roles = [];
         userRole.map((role) => {
-            roles = [...role.roles]
+            roles = [...roles, ...role.roles]
         });
         req.roles = roles;
+        
     }catch (e) {
-        return defaultResponse(res, 401, 'Uỷ quyền thất bại.', null, null, )
+        return defaultResponse(res, 401, 'Uỷ quyền thất bại.')
     }
     next();
 };

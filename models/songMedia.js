@@ -8,4 +8,9 @@ const songMediaSchema = new Schema({
     timestamps: true
 });
 
+songMediaSchema.index({
+    songId: 1,
+    mediaId: 1
+});
+
 module.exports = mongoose.model('SongMedia', songMediaSchema, 'song_medias');

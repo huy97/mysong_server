@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const songSchema = new Schema({
-    shortCode: String,
-    title: String,
+    shortCode: {type: String, default: "", unique: true},
+    title: {type: String, default: ""},
     thumbnail: {type: String, default: ""},
     thumbnailMedium: {type: String, default: ""},
     artistName: {type: String, default: ""},
@@ -25,8 +25,8 @@ const songSchema = new Schema({
     timestamps: true
 });
 songSchema.index({
-    name: 'text',
-    description: 'text',
+    title: 'text',
+    artistName: 'text',
 }, {
     weights: {
         title: 1,

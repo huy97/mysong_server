@@ -3,7 +3,7 @@ const Schema = mongoose.Schema;
 
 const userSchema = new Schema({
     fullName: {type: String, default: ""},
-    username: {type: String, default: ""},
+    username: {type: String, default: "", unique: true},
     password: {type: String, default: ""},
     accessToken: {type: String, default: ""},
     avatar: {type: String, default: ""},
@@ -12,6 +12,16 @@ const userSchema = new Schema({
     isDelete: {type: Boolean, default: false},
 }, {
     timestamps: true
+});
+
+userSchema.index({
+    username: 'text',
+    fullName: 'text',
+}, {
+    weights: {
+        username: 1,
+        fullName: 1,
+    },
 });
 
 module.exports = mongoose.model('User', userSchema);

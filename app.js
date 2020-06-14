@@ -8,7 +8,8 @@ const mongoose = require('mongoose');
 const morgan = require('morgan');
 const expressSwagger = require('express-swagger-generator');
 const cors = require('cors');
-const maintenanceMode = require('./middleware/maintenanceMode');
+const helmet = require('helmet');
+const maintenanceMode = require('./middleware/maintenance');
 const v1Router = require('./routes/v1');
 const cdnRouter = require('./routes/cdn');
 
@@ -38,6 +39,7 @@ let options = {
 };
 
 expressSwagger(app)(options);
+app.use(helmet());
 app.use(limiter);
 app.use(cors());
 app.use(express.json());
@@ -73,13 +75,15 @@ if(process.env.NODE_ENV === 'production'){
     },
     useNewUrlParser: true,
     useUnifiedTopology: true,
-    useFindAndModify: true
+    useFindAndModify: false,
+    useCreateIndex: true
   });
 }else{
   mongoose.connect(`mongodb://${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_DATABASE}`, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
-    useFindAndModify: true
+    useFindAndModify: false,
+    useCreateIndex: true
   });
 }
 
