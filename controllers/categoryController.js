@@ -131,7 +131,7 @@ const createCategory = async (req, res, next) => {
     try{
         let shortCode = cryptoRandomString({length: 10, type: 'distinguishable'});
         let slug = slugify(title, '-');
-        let link = `/nghe-si/${slug}/${shortCode}.html`;
+        let link = `/the-loai/${slug}/${shortCode}.html`;
         const category = await categoryModel.create({
             shortCode,
             title,
