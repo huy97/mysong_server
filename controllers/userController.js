@@ -16,7 +16,10 @@ const roleModel = require('../models/role');
 
 const getUserInfo = async (req, res, next) => {
     return defaultResponse(res, 200, 'Thành công',{
-        data: req.user
+        data: {
+            info: req.user,
+            permissions: req.roles
+        }
     });
 };
 

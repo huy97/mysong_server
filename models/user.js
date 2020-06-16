@@ -8,7 +8,7 @@ const userSchema = new Schema({
     accessToken: {type: String, default: ""},
     avatar: {type: String, default: ""},
     isVip: {type: Boolean, default: false},
-    startVipAt: {type: Number, default: 0},
+    vipExpiredTime: {type: Number, default: 0},
     isDelete: {type: Boolean, default: false},
 }, {
     timestamps: true
