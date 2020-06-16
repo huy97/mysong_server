@@ -15,10 +15,15 @@ const permissionModel = require('../models/permission');
 const roleModel = require('../models/role');
 
 const getUserInfo = async (req, res, next) => {
+    let roles = [];
+    req.roles.map((role) => {
+        roles = [...roles, ...role.permissionCodes];
+    });
+    roles = Array.from(new Set(roles));
     return defaultResponse(res, 200, 'Thành công',{
         data: {
             info: req.user,
-            permissions: req.roles
+            permissions: roles
         }
     });
 };
