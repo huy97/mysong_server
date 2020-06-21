@@ -7,10 +7,10 @@ const mediaModel = require('../../models/media');
 const createNewSongValidation = [
     body('title').notEmpty().withMessage('Vui lòng nhập tiêu đề.'),
     body('thumbnail').notEmpty().withMessage('Vui lòng tải lên ảnh đại diện.'),
-    body('mediaId').notEmpty().withMessage('Vui lòng tải lên file media.').custom(async (value) => {
+    body('mediaIds').isArray().isLength().withMessage('Vui lòng tải lên file media.').custom(async (value) => {
         try{
-            let existMedia = await mediaModel.findById(value);
-            if(!existMedia){
+            let existMedia = await mediaModel.find({_id: {$in: value}});
+            if(!existMedia.length){
                 return Promise.reject();
             }
         }catch (e) {
@@ -34,12 +34,12 @@ const updateSongValidation = [
         try{
             let existSong = await songModel.findById(value);
             if(!existSong){
-                return Promise.reject('Không tìm thấy dữ liệu.');
+                return Promise.reject();
             }
         }catch (e) {
-            return Promise.reject('Không tìm thấy dữ liệu.');
+            return Promise.reject();
         }
-    }).withMessage('Không tìm thấy dữ liệu.')
+    }).withMessage('Không tìm thấy dữ liệu.');
 ];
 
 const createSongLyricValidation = [

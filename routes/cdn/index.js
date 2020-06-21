@@ -8,7 +8,8 @@ const fileType = require('file-type');
 
 router.get('/*', async (req, res, next) => {
     try {
-        const filePath = path.resolve(__dirname, '../' + req.path);
+        const filePath = path.resolve(__dirname, '../../' + req.path);
+        // console.log(filePath);
         const type = await fileType.fromFile(filePath);
         const stat = fs.statSync(filePath);
         const fileSize = stat.size;
@@ -38,6 +39,7 @@ router.get('/*', async (req, res, next) => {
             file.pipe(res);
         }
     }catch (e) {
+        // console.log(e);
         return defaultResponse(res, 404, 'Trang web không tồn tại.');
     }
 });

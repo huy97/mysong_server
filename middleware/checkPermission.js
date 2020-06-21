@@ -1,4 +1,3 @@
-const {PERMISSION_CODE} = require('../utils/constant');
 const {defaultResponse} = require('../utils/helper');
 
 const hasPermission = (permission = [], roles = []) => {

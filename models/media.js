@@ -5,6 +5,7 @@ const mediaSchema = new Schema({
     shortCode: {type: String, default: "", unique: true},
     mediaType: {type: String, default: ""},
     filePath: {type: String, default: ""},
+    minimizePath: {type: String, default: ""},
     originalPath: {type: String, default: ""},
     duration: {type: Number, default: 0},
     fileSize: {type: Number, default: 0},

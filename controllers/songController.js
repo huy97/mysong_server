@@ -14,9 +14,10 @@ const songCategoryModel = require('../models/songCategory');
 const songCommentModel = require('../models/songComment');
 const songLyricModel = require('../models/songLyric');
 const songLikeModel = require('../models/songLike');
+const songArtist = require("../models/songArtist");
 
 const createNewSong = async (req, res, next) => {
-    const {title, thumbnail, mediaIds = [], hasLyric, artistName, lyricLink, zone, isOfficial, artists = [], lyrics = [], categories = []} = req.body;
+    const {title, thumbnail, thumbnailMedium, mediaIds = [], hasLyric, artistName, lyricLink, zone, isOfficial, artists = [], lyrics = [], categories = []} = req.body;
     const errors = validationResult(req);
     if(!errors.isEmpty()){
         return defaultResponse(res, 422, "Có lỗi xảy ra", null, errors.array());
@@ -29,10 +30,17 @@ const createNewSong = async (req, res, next) => {
         if(isOfficial){
             mvLink = `/video/${slug}/${shortCode}.html`;
         }
+        let status = SONG_STATUS.PRIVATE;
+        if(hasPermission([PERMISSION_CODE.MANAGER], req.roles)){
+            status = zone === "public" ? SONG_STATUS.ACTIVE : SONG_STATUS.PRIVATE;
+        }else{
+            zone = "private";
+        }
         const song = await songModel.create({
             shortCode,
             title,
             thumbnail,
+            thumbnailMedium,
             artistName,
             hasLyric,
             lyricLink,
@@ -40,6 +48,7 @@ const createNewSong = async (req, res, next) => {
             link,
             mvLink,
             zone,
+            status,
             slug,
             userId: req.user._id,
         });
@@ -75,7 +84,11 @@ const createNewSong = async (req, res, next) => {
             await song.save();
         }
         return defaultResponse(res, 200, 'Thành công', {
-            data: song.toJSON()
+            data: {
+                ...song.toJSON(),
+                artists: songArtists || [],
+                categories: songCategories || []
+            }
         });
     }catch (e) {
         console.log(e)
@@ -85,7 +98,7 @@ const createNewSong = async (req, res, next) => {
 
 const updateSong = async (req, res, next) => {
     const {songId} = req.params;
-    const {title, thumbnail, hasLyric, artistName, lyricLink, zone, status, isOfficial, artists = [], categories = []} = req.body;
+    const {title, thumbnail, thumbnailMedium, hasLyric, artistName, lyricLink, zone, status, isOfficial, artists = [], categories = [], lyrics = []} = req.body;
     const errors = validationResult(req);
     if(!errors.isEmpty()){
         return defaultResponse(res, 422, "Có lỗi xảy ra", null, errors.array());
@@ -98,6 +111,7 @@ const updateSong = async (req, res, next) => {
             }
         }
         let updateFields = {};
+        updateFields.title = title;
         updateFields.slug = !lodash.isEmpty(title) ? slugify(title, '-') : song.title;
         updateFields.link = `/music/${updateFields.slug}/${song.shortCode}.html`;
         updateFields.isOfficial = lodash.isBoolean(isOfficial) ? isOfficial : song.isOfficial;
@@ -107,39 +121,97 @@ const updateSong = async (req, res, next) => {
         updateFields.zone = !lodash.isEmpty(zone) ? zone : song.zone;
         updateFields.artistName = !lodash.isEmpty(artistName) ? artistName : song.artistName;
         updateFields.thumbnail = !lodash.isEmpty(thumbnail) ? thumbnail : song.thumbnail;
+        updateFields.thumbnailMedium = !lodash.isEmpty(thumbnailMedium) ? thumbnailMedium : song.thumbnailMedium;
         updateFields.artistName = !lodash.isEmpty(artistName) ? artistName : song.artistName;
         updateFields.hasLyric = lodash.isBoolean(hasLyric) ? hasLyric : song.hasLyric;
         updateFields.lyricLink = !lodash.isEmpty(lyricLink) ? lyricLink : song.lyricLink;
-        updateFields.status = !lodash.isEmpty(status) ? status : song.status;
-        let stackCreate = [];
+        updateFields.status = !lodash.isUndefined(status) ? status : song.status;
+        
         let stackDelete = [
             songArtistModel.deleteMany({songId: mongoose.Types.ObjectId(songId)}),
             songCategoryModel.deleteMany({songId: mongoose.Types.ObjectId(songId)})
         ];
         await Promise.all(stackDelete);
-        if(artists.length){
-            stackCreate.push(songArtistModel.create(artists.map((artistId) => {
+        let stackCreate = [
+            songArtistModel.create(artists.map((artistId) => {
                 return {
                     songId: song._id,
                     artistId: mongoose.Types.ObjectId(artistId)
                 }
-            })));
-        }
-        if(categories.length){
-            stackCreate.push(songCategoryModel.create(categories.map((categoryId) => {
+            })),
+            songCategoryModel.create(categories.map((categoryId) => {
                 return {
                     songId: song._id,
                     categoryId: mongoose.Types.ObjectId(categoryId)
                 }
-            })));
-        }
+            })),
+            songLyricModel.create(lyrics.map((lyric) => {
+                return {
+                    songId: song._id,
+                    userId: req.user._id,
+                    content: lyric
+                }
+            }))
+        ]
         await Promise.all(stackCreate);
-        const songUpdate = await songModel.findByIdAndUpdate(songId, updateFields);
-        return getSongInfo({...req, body: {shortCode: songUpdate.shortCode, slug: songUpdate.slug}}, res, next);
+        await songModel.findByIdAndUpdate(songId, updateFields, {new: true});
+        const songUpdated = await getUpdatedSong(songId);
+        if(!songUpdated.length){
+            throw Error;
+        }
+        return defaultResponse(res, 200, "Thành công", {
+            data: songUpdated[0]
+        });
     }catch(e){
         return defaultResponse(res);
     }
 };
+
+const getUpdatedSong = async (songId) => {
+    const songs = await songModel.aggregate([
+        {
+            $match: {
+                _id: mongoose.Types.ObjectId(songId)
+            }
+        },
+        {
+            $limit: 1
+        },
+        {
+            $lookup: {
+                from: 'song_categories',
+                localField: "_id",
+                foreignField: "songId",
+                as: 'categories'
+            }
+        },
+        {
+            $lookup: {
+                from: 'categories',
+                localField: "categories.categoryId",
+                foreignField: "_id",
+                as: 'categories'
+            }
+        },
+        {
+            $lookup: {
+                from: 'song_artists',
+                localField: "_id",
+                foreignField: "songId",
+                as: 'artists'
+            }
+        },
+        {
+            $lookup: {
+                from: 'artists',
+                localField: "artists.artistId",
+                foreignField: "_id",
+                as: 'artists'
+            }
+        }
+    ]);
+    return songs;
+}
 
 const deleteSong = async (req, res, next) => {
     const {songId} = req.params;
@@ -163,7 +235,7 @@ const deleteSong = async (req, res, next) => {
 
 const getSongInfo = async (req, res, next) => {
     const {slug, shortCode} = req.query;
-    
+    console.log(req.query);
     try{
         const songs = await songModel.aggregate([
             {
@@ -232,10 +304,14 @@ const getListSong = async (req, res, next) => {
     const {skip, limit} = getSkipLimit(req);
     try{
         let match = {
-            status: Number(status),
-            isOfficial: Boolean(isOfficial),
             isDelete: false
         };
+        if(isOfficial){
+            match.isOfficial = Boolean(isOfficial);
+        }
+        if(status){
+            match.status = Number(status);
+        }
         if(keyword){
             match.$text = { $search: keyword };
         }
