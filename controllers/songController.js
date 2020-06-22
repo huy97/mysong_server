@@ -8,16 +8,16 @@ const lodash = require('lodash');
 const mongoose = require('mongoose');
 const songModel = require('../models/song');
 const artistModel = require('../models/artist');
+const mediaModel = require('../models/media');
 const songMediaModel = require('../models/songMedia');
 const songArtistModel = require('../models/songArtist');
 const songCategoryModel = require('../models/songCategory');
 const songCommentModel = require('../models/songComment');
 const songLyricModel = require('../models/songLyric');
 const songLikeModel = require('../models/songLike');
-const songArtist = require("../models/songArtist");
 
 const createNewSong = async (req, res, next) => {
-    const {title, thumbnail, thumbnailMedium, mediaIds = [], hasLyric, artistName, lyricLink, zone, isOfficial, artists = [], lyrics = [], categories = []} = req.body;
+    const {title, thumbnail, thumbnailMedium, thumbnailId, mediaIds = [], hasLyric, artistName, lyricLink, zone, isOfficial, artists = [], lyrics = [], categories = []} = req.body;
     const errors = validationResult(req);
     if(!errors.isEmpty()){
         return defaultResponse(res, 422, "Có lỗi xảy ra", null, errors.array());
@@ -78,27 +78,27 @@ const createNewSong = async (req, res, next) => {
                 content: lyric
             }
         }));
-        const [songMedia, songCategories, songLyrics, songArtists, artistNames] = await Promise.all([songMediaQuery, songCategoriesQuery, songLyricsQuery, songArtistsQuery, artistQuery]);
-        if(artistNames.length){
-            song.artistName = artistNames.map((obj) => obj.fullName).join(', ');
+        const updateMediaQuery = mediaModel.updateMany({_id: {$in: mediaIds}}, {isTemp: false});
+        const result = await Promise.all([songMediaQuery, songCategoriesQuery, songLyricsQuery, songArtistsQuery, artistQuery, updateMediaQuery]);
+        if(result[4].length){
+            song.artistName = result[4].map((obj) => obj.fullName).join(', ');
             await song.save();
         }
+        const songCreated = await getUpdatedSong(song.id);
+        if(!songCreated.length){
+            throw new Error();
+        }
         return defaultResponse(res, 200, 'Thành công', {
-            data: {
-                ...song.toJSON(),
-                artists: songArtists || [],
-                categories: songCategories || []
-            }
+            data: songCreated[0]
         });
     }catch (e) {
-        console.log(e)
         return defaultResponse(res);
     }
 };
 
 const updateSong = async (req, res, next) => {
     const {songId} = req.params;
-    const {title, thumbnail, thumbnailMedium, hasLyric, artistName, lyricLink, zone, status, isOfficial, artists = [], categories = [], lyrics = []} = req.body;
+    const {title, thumbnail, thumbnailMedium, thumbnailId, hasLyric, artistName, lyricLink, zone, status, isOfficial, artists = [], categories = [], lyrics = []} = req.body;
     const errors = validationResult(req);
     if(!errors.isEmpty()){
         return defaultResponse(res, 422, "Có lỗi xảy ra", null, errors.array());
@@ -153,11 +153,10 @@ const updateSong = async (req, res, next) => {
                 }
             }))
         ]
-        await Promise.all(stackCreate);
-        await songModel.findByIdAndUpdate(songId, updateFields, {new: true});
+        await Promise.all([...stackCreate, songModel.findByIdAndUpdate(songId, updateFields)]);
         const songUpdated = await getUpdatedSong(songId);
         if(!songUpdated.length){
-            throw Error;
+            throw new Error();
         }
         return defaultResponse(res, 200, "Thành công", {
             data: songUpdated[0]

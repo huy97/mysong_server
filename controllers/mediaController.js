@@ -63,22 +63,43 @@ const uploadMediaFile = async (req, res, next) => {
     }
 };
 
-const getMediaStream = async (req, res, next) => {
-    const {songId} = req.query;
+const deleteMedia = async (req, res, next) => {
+    const {mediaIds} = req.body;
     try{
-        let songMedia = await songMediaModel.findOne({songId: mongoose.Types.ObjectId(songId)});
-        if(songMedia){
-            let media = await mediaModel.findById(songMedia.mediaId);
-            if(media){
-                return defaultResponse(res, 200, "Thành công", {
-                    data: media
-                });
-            }else{
-                throw new Error();
+
+    }catch(e){
+        return defaultResponse(res);
+    }
+}
+
+const getMediaStream = async (req, res, next) => {
+    const {songId, type = MEDIA_TYPE.AUDIO} = req.query;
+    try{
+        let songMediaQuery = songMediaModel.aggregate([
+            {
+                $match: {songId: mongoose.Types.ObjectId(songId)}
+            },
+            {
+                $lookup: {
+                    from: "media",
+                    localField: "mediaId",
+                    foreignField: "_id",
+                    as: "media"
+                }
+            },
+            {
+                $unwind: "$media"
+            },
+            {
+                $match: {"media.mediaType": type}
             }
-        }else{
-            throw new Error();
-        }
+        ]);
+        let totalQuery = songMediaModel.countDocuments({songId: mongoose.Types.ObjectId(songId)});
+        const [songMedia, total] = await Promise.all([songMediaQuery, totalQuery]);
+        return defaultResponse(res, 200, 'Thành công', {
+            total: total,
+            data: songMedia
+        })
     }catch(e){
         return defaultResponse(res);
     }
@@ -86,5 +107,6 @@ const getMediaStream = async (req, res, next) => {
 
 module.exports = {
     uploadMediaFile,
+    deleteMedia,
     getMediaStream
 };

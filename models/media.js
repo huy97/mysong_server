@@ -4,6 +4,7 @@ const Schema = mongoose.Schema;
 const mediaSchema = new Schema({
     shortCode: {type: String, default: "", unique: true},
     mediaType: {type: String, default: ""},
+    isTemp: {type: Boolean, default: true},
     filePath: {type: String, default: ""},
     minimizePath: {type: String, default: ""},
     originalPath: {type: String, default: ""},
@@ -15,7 +16,8 @@ const mediaSchema = new Schema({
 });
 
 mediaSchema.index({
-    shortCode: 1
+    shortCode: 1,
+    filePath: 1
 });
 
 module.exports = mongoose.model('Media', mediaSchema);
