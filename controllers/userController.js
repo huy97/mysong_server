@@ -31,7 +31,7 @@ const getUserInfo = async (req, res, next) => {
 const login = async (req, res, next) => {
     const {username, password} = req.body;
     try{
-        const user = await userModel.findOne({username});
+        const user = await userModel.findOne({username, isDelete: false});
         if(!user){
             return  defaultResponse(res, 422, 'Tên đăng nhập không tồn tại');
         }
@@ -53,38 +53,48 @@ const login = async (req, res, next) => {
 };
 
 const register = async (req, res, next) => {
-    const {fullName, username, password} = req.body;
+    const {fullName, username, password, avatar, isVip, vipExpiredTime} = req.body;
     const errors = validationResult(req);
     if(!errors.isEmpty()){
         return defaultResponse(res, 422, 'Vui lòng nhập đủ thông tin', null, errors.array());
     }
     try{
         const passwordHash = await bcrypt.hashSync(password, SALT_ROUND);
-        const user = await userModel.create({
+        let userObj = {
             fullName,
             username,
             password: passwordHash
-        });
-
+        }
+        let defaultRoleId = 1;
+        if(hasPermission([PERMISSION_CODE.MANAGER], req.roles)){
+            userObj = {
+                ...userObj,
+                avatar,
+                isVip,
+                vipExpiredTime,
+            }
+        }
+        const user = await userModel.create(userObj);
         let privateKey = fs.readFileSync('private.key');
         let accessToken = jwt.sign({uid: user.id, exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 30)}, privateKey);
         user.accessToken = accessToken;
         user.save();
         const userRole = await userRoleModel.create({
             userId: user.id,
-            roleId: 1
+            roleId: defaultRoleId
         });
         return defaultResponse(res, 200, 'Tạo tài khoản thành công.', {
             data: user
         });
     }catch (e) {
+        console.log(e);
         return defaultResponse(res)
     }
 };
 
 const updateUser = async (req, res, next) => {
     const {userId} = req.params;
-    const {fullName, avatar} = req.body;
+    const {fullName, avatar, newPassword, isVip, vipExpiredTime} = req.body;
     const errors = validationResult(req);
     if(!errors.isEmpty()){
         return defaultResponse(res, 422, 'Vui lòng nhập đủ thông tin', null, errors.array());
@@ -99,6 +109,14 @@ const updateUser = async (req, res, next) => {
         if(!user){
             return defaultResponse(res, 422, 'User không tồn tại.');
         }
+        if(hasPermission([PERMISSION_CODE.MANAGER], req.roles)){
+            user.isVip = isVip;
+            user.vipExpiredTime = vipExpiredTime;
+            if(newPassword){
+                const passwordHash = await bcrypt.hashSync(newPassword, SALT_ROUND);
+                user.password = passwordHash;
+            }
+        }
         user.fullName = fullName;
         if(avatar){
             user.avatar = avatar;
@@ -111,6 +129,26 @@ const updateUser = async (req, res, next) => {
         return defaultResponse(res);
     }
 };
+
+const deleteUser = async (req, res, next) => {
+    const {userId} = req.params;
+    try{
+        if(userId === req.user.id){
+            return defaultResponse(res, 422, 'Bạn không thể xoá chính bạn.');
+        }
+        let user = await userModel.findById(userId);
+        if(!user){
+            return defaultResponse(res, 422, 'User không tồn tại.');
+        }
+        user.isDelete = true;
+        await user.save();
+        return defaultResponse(res, 200, 'Thành công', {
+            data: user
+        });
+    }catch(e){
+        return defaultResponse(res);
+    }
+}
 
 const changePassword = async (req, res, next) => {
     const {userId} = req.params;
@@ -353,14 +391,13 @@ const getFollowedArtists = async (req, res, next) => {
 };
 
 const getListUser = async (req, res, next) => {
-    const {keyword, isDelete, isVip} = req.query;
+    const {keyword, isVip} = req.query;
     try{
         const {skip, limit} = getSkipLimit(req);
-        let match = {
-            isDelete: Boolean(isDelete),
-            isVip: Boolean(isVip),
-            isDelete: false
-        };
+        let match = {};
+        if(isVip){
+            match.isVip = Boolean(isVip);
+        }
         if(keyword){
             match.$text = { $search: keyword };
         }
@@ -522,6 +559,7 @@ module.exports = {
     getLikedSongs,
     getFollowedArtists,
     updateUser,
+    deleteUser,
     changePassword,
     logout,
     getListUser,

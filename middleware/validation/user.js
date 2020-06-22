@@ -23,7 +23,9 @@ const createUserValidation = [
 ];
 
 const updateUserValidation = [
-    body('fullName').notEmpty().withMessage('Vui lòng nhập tên hiển thị.')
+    body('fullName').notEmpty().withMessage('Vui lòng nhập tên hiển thị.'),
+    body('newPassword').optional().isLength({min: 6}).withMessage("Mật khẩu phải ít nhất 6 ký tự.")
+        .isLength({max: 32}).withMessage("Mật khẩu không được quá 32 ký tự."),
 ];
 
 const updateUserPasswordValidation = [
