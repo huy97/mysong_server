@@ -39,7 +39,7 @@ const updateSongValidation = [
         }catch (e) {
             return Promise.reject();
         }
-    }).withMessage('Không tìm thấy dữ liệu.');
+    }).withMessage('Không tìm thấy dữ liệu.')
 ];
 
 const createSongLyricValidation = [
