@@ -63,15 +63,6 @@ const uploadMediaFile = async (req, res, next) => {
     }
 };
 
-const deleteMedia = async (req, res, next) => {
-    const {mediaIds} = req.body;
-    try{
-
-    }catch(e){
-        return defaultResponse(res);
-    }
-}
-
 const getMediaStream = async (req, res, next) => {
     const {songId, type = MEDIA_TYPE.AUDIO} = req.query;
     try{
@@ -107,6 +98,5 @@ const getMediaStream = async (req, res, next) => {
 
 module.exports = {
     uploadMediaFile,
-    deleteMedia,
     getMediaStream
 };

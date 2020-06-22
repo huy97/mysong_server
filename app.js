@@ -6,7 +6,6 @@ const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const mongoose = require('mongoose');
 const morgan = require('morgan');
-const expressSwagger = require('express-swagger-generator');
 const cors = require('cors');
 const helmet = require('helmet');
 const maintenanceMode = require('./middleware/maintenance');
@@ -20,25 +19,6 @@ const limiter = rateLimit({
   message: "Hệ thống bận, vui lòng quay lại sau"
 });
 
-let options = {
-  swaggerDefinition: {
-    info: {
-      description: '',
-      title: 'Swagger',
-      version: '1.0.0',
-    },
-    host: 'localhost:' + (process.env.PORT || 3000),
-    basePath: '/api/v1',
-    produces: [
-      "application/json"
-    ],
-    schemes: ['http', 'https'],
-  },
-  basedir: __dirname,
-  files: ['./controllers/**/*.js']
-};
-
-expressSwagger(app)(options);
 app.use(helmet());
 // app.use(limiter);
 app.use(cors());

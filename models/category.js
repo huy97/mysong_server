@@ -16,6 +16,7 @@ const categorySchema = new Schema({
 
 categorySchema.index({
     shortCode: 1,
+    slug: 1,
     title: 'text',
 }, {
     weights: {

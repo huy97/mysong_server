@@ -17,6 +17,7 @@ const artistSchema = new Schema({
 
 artistSchema.index({
     shortCode: 1,
+    slug: 1,
     fullName: 'text'
 }, {
     weights: {

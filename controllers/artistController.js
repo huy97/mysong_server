@@ -7,6 +7,7 @@ const followArtistModel = require('../models/followArtist');
 const songArtist = require('../models/songArtist');
 const { validationResult } = require('express-validator');
 
+
 const getListArtists = async (req, res, next) => {
     const {skip, limit} = getSkipLimit(req);
     try{
@@ -25,9 +26,9 @@ const getListArtists = async (req, res, next) => {
 }
 
 const getArtistInfo = async (req, res, next) => {
-    const {shortCode} = req.query;
+    const {slug, shortCode} = req.query;
     try{
-        const artist = await artistModel.findOne({shortCode});
+        const artist = await artistModel.findOne({slug, shortCode});
         if(!artist){
             return defaultResponse(res, 422, "Không tìm thấy dữ liệu.")
         }
