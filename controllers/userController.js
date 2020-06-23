@@ -121,11 +121,40 @@ const updateUser = async (req, res, next) => {
         if(avatar){
             user.avatar = avatar;
         }
-        await user.save();
+        let usersQuery = userModel.aggregate([
+            {
+                $match: {
+                    _id: user._id
+                }
+            },
+            {
+              $sort: {
+                  createdAt: -1
+              }
+            },
+            {
+                $lookup: {
+                    from: 'user_roles',
+                    localField: "_id",
+                    foreignField: "userId",
+                    as: 'roles'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'roles',
+                    localField: "roles.roleId",
+                    foreignField: "roleId",
+                    as: 'roles'
+                }
+            }
+        ]);
+        const [saved, newUser] = await Promise.all([user.save(), usersQuery]);
         return defaultResponse(res, 200, 'Thành công', {
-            data: user
+            data: newUser[0]
         });
     }catch (e) {
+        console.log(e);
         return defaultResponse(res);
     }
 };
@@ -466,7 +495,7 @@ const getPermissions = async (req, res, next) => {
 const getListRoles = async (req, res, next) => {
     try{
         const {skip, limit} = getSkipLimit(req);
-        const resultQuery = roleModel.find({}).skip(skip).limit(limit);
+        const resultQuery = roleModel.find({}).skip(skip).limit(limit).sort({createdAt: -1});
         const totalQuery = roleModel.countDocuments();
         const [result, total] = await Promise.all([resultQuery, totalQuery]);
         return defaultResponse(res, 200, 'Thành công', {
@@ -507,9 +536,10 @@ const updateRole = async (req, res, next) => {
         if(permissionCodes && Array.isArray(permissionCodes)){
             updateFields.permissionCodes = permissionCodes;
         }
-        const result = await roleModel.updateOne({roleId}, updateFields, {
+        const result = await roleModel.findOneAndUpdate({roleId}, updateFields, {
             new: true
         });
+        console.log(result);
         return defaultResponse(res, 200, 'Thành công', {
             data: result
         });
