@@ -20,7 +20,7 @@ const createNewSong = async (req, res, next) => {
     const {title, thumbnail, thumbnailMedium, thumbnailId, mediaIds = [], hasLyric, artistName, lyricLink, zone, isOfficial, artists = [], lyrics = [], categories = []} = req.body;
     const errors = validationResult(req);
     if(!errors.isEmpty()){
-        return defaultResponse(res, 422, "Có lỗi xảy ra", null, errors.array());
+        return defaultResponse(res, 422, "Vui lòng nhập đủ thông tin.", null, errors.array());
     }
     try{
         let shortCode = cryptoRandomString({length: 10, type: 'distinguishable'});
@@ -101,7 +101,7 @@ const updateSong = async (req, res, next) => {
     const {title, thumbnail, thumbnailMedium, thumbnailId, hasLyric, artistName, lyricLink, zone, status, isOfficial, artists = [], categories = [], lyrics = []} = req.body;
     const errors = validationResult(req);
     if(!errors.isEmpty()){
-        return defaultResponse(res, 422, "Có lỗi xảy ra", null, errors.array());
+        return defaultResponse(res, 422, "Vui lòng nhập đủ thông tin.", null, errors.array());
     }
     try{
         const song = await songModel.findById(songId);
@@ -305,13 +305,13 @@ const getListSong = async (req, res, next) => {
         let match = {
             isDelete: false
         };
-        if(isOfficial){
+        if(!lodash.isEmpty(isOfficial)){
             match.isOfficial = Boolean(isOfficial);
         }
-        if(status){
+        if(!lodash.isEmpty(status)){
             match.status = Number(status);
         }
-        if(keyword){
+        if(!lodash.isEmpty(keyword)){
             match.$text = { $search: keyword };
         }
         const songQuery = songModel.aggregate([
@@ -468,7 +468,7 @@ const createSongLyric = async (req, res, next) => {
     const {songId, content} = req.body;
     const errors = validationResult(req);
     if(!errors.isEmpty()){
-        return defaultResponse(res, 422, "Có lỗi xảy ra", null, errors.array());
+        return defaultResponse(res, 422, "Vui lòng nhập đủ thông tin.", null, errors.array());
     }
     try {
         const songLyric = await songLyricModel.create({
@@ -489,7 +489,7 @@ const updateSongLyric = async (req, res, next) => {
     const {content} = req.body;
     const errors = validationResult(req);
     if(!errors.isEmpty()){
-        return defaultResponse(res, 422, "Có lỗi xảy ra", null, errors.array());
+        return defaultResponse(res, 422, "Vui lòng nhập đủ thông tin.", null, errors.array());
     }
     try {
         const songLyric = await songLyricModel.findById(lyricId);
@@ -532,7 +532,7 @@ const createSongComment = async (req, res, next) => {
     const {songId, content} = req.body;
     const errors = validationResult(req);
     if(!errors.isEmpty()){
-        return defaultResponse(res, 422, "Có lỗi xảy ra", null, errors.array());
+        return defaultResponse(res, 422, "Vui lòng nhập đủ thông tin.", null, errors.array());
     }
     try {
         const songComment = await songCommentModel.create({

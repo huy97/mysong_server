@@ -394,11 +394,13 @@ const getListUser = async (req, res, next) => {
     const {keyword, isVip} = req.query;
     try{
         const {skip, limit} = getSkipLimit(req);
-        let match = {};
-        if(isVip){
+        let match = {
+            isDelete: false
+        };
+        if(!lodash.isEmpty(isVip)){
             match.isVip = Boolean(isVip);
         }
-        if(keyword){
+        if(!lodash.isEmpty(keyword)){
             match.$text = { $search: keyword };
         }
         

@@ -160,7 +160,7 @@ const createArtist = async (req, res, next) => {
     const {fullName, thumbnail, cover, isComposer = false} = req.body;
     const errors = validationResult(req)
     if(!errors.isEmpty()){
-        return defaultResponse(res, 422, 'Có lỗi xảy ra.', null, errors.array());
+        return defaultResponse(res, 422, 'Vui lòng nhập đủ thông tin.', null, errors.array());
     }
     try{
         let shortCode = cryptoRandomString({length: 10, type: 'distinguishable'});
@@ -188,7 +188,7 @@ const updateArtist = async (req, res, next) => {
     const {fullName, thumbnail, cover, isComposer = false} = req.body;
     const errors = validationResult(req)
     if(!errors.isEmpty()){
-        return defaultResponse(res, 422, 'Có lỗi xảy ra.', null, errors.array());
+        return defaultResponse(res, 422, 'Vui lòng nhập đủ thông tin.', null, errors.array());
     }
     try{
         const artist = await artistModel.findById(artistId);

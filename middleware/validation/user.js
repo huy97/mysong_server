@@ -1,7 +1,7 @@
 const {body, param} = require('express-validator');
 const userModel = require('../../models/user');
 
-const createUserValidation = [
+const registerValidation = [
     body('fullName').notEmpty().withMessage('Vui lòng nhập tên hiển thị.'),
     body('username').notEmpty().withMessage('Vui lòng nhập tên đăng nhập.')
         .isLength({min: 5}).withMessage("Tên đăng nhập phải ít nhất 5 ký tự.")
@@ -22,8 +22,14 @@ const createUserValidation = [
         }).withMessage('Hai mật khẩu không giống nhau.')
 ];
 
+const createUserValidation = [
+    ...registerValidation,
+    body('avatar').notEmpty().withMessage('Vui lòng tải lên ảnh đại diện')
+];
+
 const updateUserValidation = [
     body('fullName').notEmpty().withMessage('Vui lòng nhập tên hiển thị.'),
+    body('avatar').notEmpty().withMessage('Vui lòng tải lên ảnh đại diện.'),
     body('newPassword').optional().isLength({min: 6}).withMessage("Mật khẩu phải ít nhất 6 ký tự.")
         .isLength({max: 32}).withMessage("Mật khẩu không được quá 32 ký tự."),
 ];
@@ -39,8 +45,15 @@ const updateUserPasswordValidation = [
         }).withMessage('Hai mật khẩu không giống nhau.')
 ];
 
+const createRole = [
+    body('description').notEmpty().withMessage('Vui lòng nhập mô tả.'),
+    body('permissionCodes').isArray().isLength().withMessage('Vui lòng chọn quyền.'),
+]
+
 module.exports = {
+    registerValidation,
     createUserValidation,
     updateUserValidation,
     updateUserPasswordValidation,
+    createRole
 };

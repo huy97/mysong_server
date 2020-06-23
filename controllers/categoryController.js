@@ -126,7 +126,7 @@ const createCategory = async (req, res, next) => {
     const {title, thumbnail, cover, description} = req.body;
     const errors = validationResult(req)
     if(!errors.isEmpty()){
-        return defaultResponse(res, 422, 'Có lỗi xảy ra.', null, errors.array());
+        return defaultResponse(res, 422, 'Vui lòng nhập đủ thông tin.', null, errors.array());
     }
     try{
         let shortCode = cryptoRandomString({length: 10, type: 'distinguishable'});
@@ -154,7 +154,7 @@ const updateCategory = async (req, res, next) => {
     const {title, thumbnail, cover, description} = req.body;
     const errors = validationResult(req)
     if(!errors.isEmpty()){
-        return defaultResponse(res, 422, 'Có lỗi xảy ra.', null, errors.array());
+        return defaultResponse(res, 422, 'Vui lòng nhập đủ thông tin.', null, errors.array());
     }
     try{
         const category = await categoryModel.findById(categoryId);
