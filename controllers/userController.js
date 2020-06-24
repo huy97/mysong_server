@@ -128,11 +128,6 @@ const updateUser = async (req, res, next) => {
                 }
             },
             {
-              $sort: {
-                  createdAt: -1
-              }
-            },
-            {
                 $lookup: {
                     from: 'user_roles',
                     localField: "_id",
@@ -566,19 +561,48 @@ const updateUserRoles = async (req, res, next) => {
         if(!user){
             return defaultResponse(res, 422, 'User không tồn tại.');
         }
-        await userRoleModel.deleteMany({userId});
-        let result = [];
         if(Array.isArray(roleIds) && roleIds.length){
-            result = await userRoleModel.create(roleIds.map((roleId) => {
+            let existsRole = await userRoleModel.find({roleId: {$in: roleIds}});
+            if(!existsRole.length){
+                return defaultResponse(res, 422, 'Phân quyền không hợp lệ.');
+            }
+            let roleDeleteQuery = userRoleModel.deleteMany({userId});
+            let roleCreateQuery = userRoleModel.create(roleIds.map((roleId) => {
                 return {
                     roleId,
                     userId
                 }
             }));
+            let usersQuery = userModel.aggregate([
+                {
+                    $match: {
+                        _id: user._id
+                    }
+                },
+                {
+                    $lookup: {
+                        from: 'user_roles',
+                        localField: "_id",
+                        foreignField: "userId",
+                        as: 'roles'
+                    }
+                },
+                {
+                    $lookup: {
+                        from: 'roles',
+                        localField: "roles.roleId",
+                        foreignField: "roleId",
+                        as: 'roles'
+                    }
+                }
+            ]);
+            const [deleted, roles] = await Promise.all([roleDeleteQuery, roleCreateQuery]);
+            const newUser = await usersQuery;
+            return defaultResponse(res, 200, 'Thành công', {
+                data: newUser[0]
+            });
         }
-        return defaultResponse(res, 200, 'Thành công', {
-            data: result
-        });
+        return defaultResponse(res, 422, 'Vui lòng chọn quyền.');
     }catch(e){
         return defaultResponse(res);
     }
