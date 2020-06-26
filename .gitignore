@@ -5,3 +5,4 @@
 /media_storage/*
 /storage/*
 /.vscode
+.env

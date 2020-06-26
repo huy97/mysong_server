@@ -1,8 +1,7 @@
 const {MEDIA_TYPE} = require('./constant');
 
-const defaultResponse = (res, status = 500, message = 'Có lỗi xảy ra, vui lòng quay lại sau.', data = {}, errors, code = 0) => {
+const defaultResponse = (res, status = 500, message = 'Có lỗi xảy ra, vui lòng quay lại sau.', data = {}, errors) => {
     return res.status(status).json({
-        code,
         status,
         message,
         ...data,

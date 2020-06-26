@@ -8,26 +8,36 @@ const mongoose = require('mongoose');
 const morgan = require('morgan');
 const cors = require('cors');
 const helmet = require('helmet');
-const maintenanceMode = require('./middleware/maintenance');
 const v1Router = require('./routes/v1');
 const cdnRouter = require('./routes/cdn');
 
 const app = express();
+
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: 60 * 1000,
   max: 100,
   message: "Hệ thống bận, vui lòng quay lại sau"
 });
 
+let whitelist = ['http://localhost:3000'];
+let corsOptionsMiddleware = function (req, callback) {
+  let corsOptions;
+  if (whitelist.indexOf(req.header('Origin')) !== -1) {
+    corsOptions = { origin: true }
+  } else {
+    corsOptions = { origin: false }
+  }
+  callback(null, corsOptions);
+}
+
 app.use(helmet());
-// app.use(limiter);
-app.use(cors());
+app.use(limiter);
+app.use(cors(corsOptionsMiddleware));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(morgan('tiny'));
-app.use(maintenanceMode(process.env.NODE_ENV));
 app.use('/api/v1', v1Router);
 app.use('/cdn', cdnRouter);
 
