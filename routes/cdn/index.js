@@ -20,7 +20,7 @@ router.get('/*', async (req, res, next) => {
             const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
             const chunksize = end - start + 1;
             const file = fs.createReadStream(filePath, {start, end});
-            console.log(file)
+            // console.log(file)
             const head = {
                 "Content-Range": `bytes ${start}-${end}/${fileSize}`,
                 "Accept-Ranges": "bytes",

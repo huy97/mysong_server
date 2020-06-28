@@ -23,7 +23,7 @@ let whitelist = ['http://localhost:3000'];
 let corsOptionsMiddleware = function (req, callback) {
   let corsOptions;
   if (whitelist.indexOf(req.header('Origin')) !== -1) {
-    corsOptions = { origin: true }
+    corsOptions = { origin: true, credentials: true }
   } else {
     corsOptions = { origin: false }
   }
